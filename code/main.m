@@ -14,9 +14,9 @@ child_relation{4} = [];                     %head
 %child_relation{5} = [];                     %head
 %child_relation{6} = [];                     %head
 
-deform_param = [0.5; 0.5; 1; 1];
+deform_param = [1; 1; 1; 1];
 deform_param = repmat(deform_param, [1, 4, 4]);
 deform_param = permute(deform_param, [3, 2, 1]);
 
 a = PoseEstimator(ideal_parameters, [2, 3, 4, 1], child_relation, deform_param);
-proposed_parts = a.estimate('000071.jpg');
+proposed_parts = a.estimate('000063.jpg');

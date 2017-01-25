@@ -161,12 +161,12 @@ classdef PoseEstimator < handle
                 end
                 energies(1) = current_min_energy; %min return first element when equal
                 [current_min_energy, best_idx] = min(energies);
-                best_idx
+                %best_idx
                 if best_idx > 1
                     current_min = all_neighbors(best_idx - 1, :);
                 else
-                    current_min
-                    l_parent
+                    %current_min
+                    %l_parent
                     return;
                 end
             end            
