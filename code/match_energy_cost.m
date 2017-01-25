@@ -30,7 +30,7 @@ if part==1 | part ==6
     end
 end
 dat_scale=sqrt(sum([dat_pt(1)-dat_pt(3),dat_pt(2)-dat_pt(4)].^2))/model_len(part);
-dat_val=[dat_x, dat_y, dat_theta, dat_scale]
+dat_val=[dat_x, dat_y, dat_theta, dat_scale];
 diff=(dat_val-L).*[0.5 0.5 100 100];
 cost=sum(diff.^2);
 end

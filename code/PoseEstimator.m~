@@ -2,7 +2,7 @@ classdef PoseEstimator < handle
     
      properties (GetAccess = public, SetAccess = public)
         
-        num_parts
+        num_parts = 4
         num_x_buckets = 50
         num_y_buckets = 50
         num_theta_buckets = 20
@@ -28,6 +28,7 @@ classdef PoseEstimator < handle
         
         %image info
         image_dir = '../buffy_s5e2_original/';
+        all_names
         seq
         img_height
         img_width
@@ -37,6 +38,17 @@ classdef PoseEstimator < handle
      methods (Access = public)
          function obj = PoseEstimator(ideal_parameters, table_set_order, child_relation, deform_cost_weights)
             
+            all_names = dir(obj.image_dir);
+            obj.all_names = containers.Map();
+            counter = 0;
+            for n = 1: numel(all_names)
+                if length(all_names(n).name) ~= 10
+                    continue
+                else
+                    counter = counter + 1;
+                    obj.all_names(all_names(n).name) = counter;
+                end
+            end
             obj.table_set_order = table_set_order;
             obj.child_relation = child_relation;
             obj.parent_relation = cell(numel(obj.child_relation), 1);
@@ -74,7 +86,7 @@ classdef PoseEstimator < handle
             %Mapping: mat2str(l_parent)->[min_energy, best_location]
             obj.energy_map = cell(numel(obj.ideal_parameters), 1);
             for i = 1: numel(obj.ideal_parameters)
-                obj.energy_map{i} = containers.Map('ValueType', 'any');
+                obj.energy_map{i} = containers.Map();
             end
          end
          
@@ -94,7 +106,7 @@ classdef PoseEstimator < handle
                                       parent_part_idx, l_parent)
              %check invalid location
              if sum(l_self([1, 2, 4]) > 0) ~= 3 ...
-                || l_self(4) >=0 ...
+                || l_self(3) < 0 ...
                 || l_self(1) > obj.img_width ...
                 || l_self(2) > obj.img_height ...
                 || l_self(3) > 360 ...
@@ -103,7 +115,7 @@ classdef PoseEstimator < handle
                 return;
              end
              %pairwise
-             if parent_part_idx ~= 0
+             if parent_part_idx
                  pair_wise_energy = obj.deformCost(parent_part_idx, ...
                                                   self_part_idx, ...
                                                   l_parent, ...
@@ -133,7 +145,7 @@ classdef PoseEstimator < handle
                         randi([1, obj.num_x_buckets]), ...
                         randi([1, obj.num_theta_buckets]), ...
                         randi([1, obj.num_scale_buckets])];
-            current_min = 0.5 * obj.step_size + init_idx - 1;
+            current_min = 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
             current_min_energy = obj.calcEnergy(self_part_idx, current_min, parent_part_idx, l_parent);
             while true
                 neighbors1 = repmat(current_min, [4, 1]) - eye(4) .* diag(obj.step_size);
@@ -141,12 +153,12 @@ classdef PoseEstimator < handle
                 all_neighbors = [neighbors1; neighbors2];
                 energies = zeros(9, 1);
                 for i = 2: 9
-                    energies(i) = obj.calcEnergy(self_part_idx, all_neighbors(:, i - 1), parent_part_idx, l_parent);
+                    energies(i) = obj.calcEnergy(self_part_idx, all_neighbors(i - 1, :), parent_part_idx, l_parent);
                 end
                 energies(1) = current_min_energy; %min return first element when equal
                 [current_min_energy, best_idx] = min(energies);
-                if best_idx < 9
-                    current_min = all_neighbors(best_idx);
+                if best_idx > 1
+                    current_min = all_neighbors(best_idx - 1, :);
                 else
                     return;
                 end
@@ -164,13 +176,16 @@ classdef PoseEstimator < handle
                                  scales(1: obj.num_scale_buckets)).';
                              
             for i = 1: size(all_combos, 1)
-                obj.energy_map{part_idx}(mat2str(all_combos(i))) = ...
-                    obj.localMin(part_idx, obj.parent_relation{part_idx}, all_combos(i));
+                fprintf('Part: %d, possiblility %d/500000\n', part_idx, i);
+                [temp_min_energy, temp_min] = ...
+                    obj.localMin(part_idx, obj.parent_relation{part_idx}, all_combos(i, :));
+                obj.energy_map{part_idx}(mat2str(all_combos(i, :))) = ...
+                    [temp_min_energy, temp_min];
             end
          end
          
          function parts = estimate(obj, seq)
-            obj.seq = seq;
+            obj.seq = obj.all_names(seq);
             img = imread(fullfile(obj.image_dir, seq));
             [obj.img_height, obj.img_width] = size(img);
             obj.step_size = [floor(obj.img_width / obj.num_x_buckets), ...
@@ -183,7 +198,30 @@ classdef PoseEstimator < handle
             end
              
             %backward return optimal values for parts
-            parts = []
+            parts = zeros(obj.num_parts, 4);
+            for j = numel(obj.table_set_order): -1: 1
+                % not backtrace yet
+                if sum(parts(obj.table_set_order(j), :) == 0) == 4
+                    %not root
+                    if obj.parent_relation{obj.table_set_order(j)}
+                        temp = obj.energy_map{obj.table_set_order(j)} ...
+                            (mat2str(parts(obj.parent_relation{obj.table_set_order(j)})));
+                        parts(obj.table_set_order(j), :) = temp(2: 5);
+                    else%root
+                        vals = values(obj.energy_map{obj.table_set_order(j)});
+                        [~, idx] = min(vals(:, 5));
+                        all_keys = keys(obj.energy_map{obj.table_set_order(j)});
+                        parts(obj.table_set_order(j), :) = eval(all_keys(idx));
+                    end
+                end
+                %find the child of this part
+                for c = 1: numel(obj.child_relation{obj.table_set_order{j}})
+                    child_part_idx = obj.child_relation{obj.table_set_order{j}}(c);
+                    temp = obj.energy_map{child_part_idx} ...
+                            (mat2str(parts(obj.parent_relation{obj.table_set_order(j)})));
+                    parts(child_part_idx, :) = temp(2: 5);
+                end
+            end
          end
          
          function reset(obj)
