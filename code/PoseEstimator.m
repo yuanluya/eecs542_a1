@@ -3,8 +3,8 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 50
-        num_y_buckets = 50
+        num_x_buckets = 25
+        num_y_buckets = 25
         num_theta_buckets = 20
         num_scale_buckets = 10
         
@@ -21,6 +21,7 @@ classdef PoseEstimator < handle
         %need to be tuned
         %[variable X partNum X partNum]
         deform_cost_weights
+        match_cost_weights = 1e-3
         
         
         %define energy functions
@@ -137,17 +138,20 @@ classdef PoseEstimator < handle
              match_energy = match_energy_cost(l_self, self_part_idx, obj.seq);
              
              %total
-             energy = pair_wise_energy + match_energy + children_energy;
+             energy = pair_wise_energy + obj.match_cost_weights * match_energy + children_energy;
          end
          
-         function [current_min_energy, current_min] = localMin(obj, self_part_idx, parent_part_idx, l_parent)
+         function [current_min_energy, current_min] = localMin(obj, self_part_idx, parent_part_idx, l_parent)            
+            %{
             init_idx = [randi([1, obj.num_x_buckets]), ...
-                        randi([1, obj.num_x_buckets]), ...
-                        randi([1, obj.num_theta_buckets]), ...
-                        randi([1, obj.num_scale_buckets])];
+                        randi([1, obj.num_x_buckets]), 1, 1];
+                        %randi([1, obj.num_theta_buckets]), ...
+                        %randi([1, obj.num_scale_buckets])];
             current_min = 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
-            current_min_energy = obj.calcEnergy(self_part_idx, current_min, parent_part_idx, l_parent);
-            while true
+             %}
+            current_min = l_parent;
+            current_min_energy = obj.calcEnergy(self_part_idx, current_min, parent_part_idx, l_parent);            
+            while true                
                 neighbors1 = repmat(current_min, [4, 1]) - eye(4) .* diag(obj.step_size);
                 neighbors2 = repmat(current_min, [4, 1]) + eye(4) .* diag(obj.step_size);
                 all_neighbors = [neighbors1; neighbors2];
@@ -157,14 +161,15 @@ classdef PoseEstimator < handle
                 end
                 energies(1) = current_min_energy; %min return first element when equal
                 [current_min_energy, best_idx] = min(energies);
+                best_idx
                 if best_idx > 1
                     current_min = all_neighbors(best_idx - 1, :);
                 else
-                    current_min_energy
                     current_min
+                    l_parent
                     return;
                 end
-            end
+            end            
          end
          
          function updateEnergymap(obj, part_idx)
@@ -178,9 +183,10 @@ classdef PoseEstimator < handle
                                  scales(1: obj.num_scale_buckets)).';
                              
             for i = 1: size(all_combos, 1)
-                fprintf('Part: %d, possiblility %d/500000\n', part_idx, i);
+                fprintf('Part: %d, possiblility %d/%d\n', part_idx, i, ...
+                    obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);                
                 [temp_min_energy, temp_min] = ...
-                    obj.localMin(part_idx, obj.parent_relation{part_idx}, all_combos(i, :));
+                    obj.localMin(part_idx, obj.parent_relation{part_idx}, all_combos(i, :));                
                 obj.energy_map{part_idx}(mat2str(all_combos(i, :))) = ...
                     [temp_min_energy, temp_min];
             end
@@ -189,7 +195,7 @@ classdef PoseEstimator < handle
          function parts = estimate(obj, seq)
             obj.seq = obj.all_names(seq);
             img = imread(fullfile(obj.image_dir, seq));
-            [obj.img_height, obj.img_width] = size(img);
+            [obj.img_height, obj.img_width, ~] = size(img);
             obj.step_size = [floor(obj.img_width / obj.num_x_buckets), ...
                              floor(obj.img_height / obj.num_y_buckets), ...
                              360 / obj.num_theta_buckets, 2 / obj.num_scale_buckets];
