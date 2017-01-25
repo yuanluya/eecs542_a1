@@ -34,6 +34,9 @@ classdef PoseEstimator < handle
         img_height
         img_width
         
+        %match cost cashe
+        match_cost_cashe
+        
      end
      
      methods (Access = public)
@@ -89,6 +92,12 @@ classdef PoseEstimator < handle
             for i = 1: numel(obj.ideal_parameters)
                 obj.energy_map{i} = containers.Map();
             end
+            
+            %initialize match cost cashe
+            obj.match_cost_cashe = cell(numel(obj.ideal_parameters),1);
+            for j = 1:numel(obj.match_cost_cashe)
+                obj.match_cost_cashe{j} = containers.Map();
+            end
          end
          
          function cost = deformCost(obj, part_p, part_c, lp, lc)
@@ -135,7 +144,11 @@ classdef PoseEstimator < handle
              end
              
              %match
-             match_energy = match_energy_cost(l_self, self_part_idx, obj.seq);
+             if(~isKey(obj.match_cost_cashe{self_part_idx},mat2str(l_self)))
+                 obj.match_cost_cashe{self_part_idx}(mat2str(l_self)) = ...
+                 match_energy_cost(l_self, self_part_idx, obj.seq);
+             end
+             match_energy = obj.match_cost_cashe{self_part_idx}(mat2str(l_self));
              
              %total
              energy = pair_wise_energy + obj.match_cost_weights * match_energy + children_energy;
@@ -161,7 +174,7 @@ classdef PoseEstimator < handle
                 end
                 energies(1) = current_min_energy; %min return first element when equal
                 [current_min_energy, best_idx] = min(energies);
-                best_idx
+                best_idx;
                 if best_idx > 1
                     current_min = all_neighbors(best_idx - 1, :);
                 else
@@ -236,7 +249,9 @@ classdef PoseEstimator < handle
             obj.energy_map = cell(numel(obj.ideal_parameters), 1);
             for i = 1: numel(obj.ideal_parameters)
                 obj.energy_map{i} = containers.Map('ValueType', 'any');
+                obj.match_cost_cashe{i} = containers.Map('ValueType', 'any');
             end
+                
          end
      end
 end
