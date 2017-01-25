@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 25
-        num_y_buckets = 25
-        num_theta_buckets = 20
-        num_scale_buckets = 10
+        num_x_buckets = 20
+        num_y_buckets = 20
+        num_theta_buckets = 10
+        num_scale_buckets = 5
         
         %[x, y, theta, scale], scale: [0, 2.0]
         ideal_parameters
@@ -144,11 +144,11 @@ classdef PoseEstimator < handle
              end
              
              %match
-             if(~isKey(obj.match_cost_cashe{self_part_idx},mat2str(l_self)))
-                 obj.match_cost_cashe{self_part_idx}(mat2str(l_self)) = ...
+             if(~isKey(obj.match_cost_cache{self_part_idx},mat2str(l_self)))
+                 obj.match_cost_cache{self_part_idx}(mat2str(l_self)) = ...
                  match_energy_cost(l_self, self_part_idx, obj.seq);
              end
-             match_energy = obj.match_cost_cashe{self_part_idx}(mat2str(l_self));
+             match_energy = obj.match_cost_cache{self_part_idx}(mat2str(l_self));
              
              %total
              energy = pair_wise_energy + obj.match_cost_weights * match_energy + children_energy;
@@ -251,7 +251,6 @@ classdef PoseEstimator < handle
                 obj.energy_map{i} = containers.Map('ValueType', 'any');
                 obj.match_cost_cache{i} = containers.Map('ValueType', 'any');
             end
-                
          end
      end
 end
