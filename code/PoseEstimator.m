@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 5
-        num_y_buckets = 5
-        num_theta_buckets = 2
-        num_scale_buckets = 2
+        num_x_buckets = 20
+        num_y_buckets = 20
+        num_theta_buckets = 10
+        num_scale_buckets = 5
         model_len = [160, 95, 95, 65, 65, 60];
         
         %[x, y, theta, scale], scale: [0, 2.0]
@@ -23,6 +23,7 @@ classdef PoseEstimator < handle
         %need to be tuned
         %[variable X partNum X partNum]
         deform_cost_weights
+        random_init_radius = [-0, 0]
         match_cost_weights = 1
         
         
@@ -158,6 +159,19 @@ classdef PoseEstimator < handle
              energy = pair_wise_energy + obj.match_cost_weights * match_energy + children_energy;
          end
          
+         
+         function real_child = sampleFromParent(obj, self_part_idx, parent_part_idx, l_parent)
+             optimal_child = [l_parent(1) + obj.ideal_parameters{1}(parent_part_idx, self_part_idx), ...
+                              l_parent(2) + obj.ideal_parameters{2}(parent_part_idx, self_part_idx), 0, 1];
+             %random sample from optimal_child
+             real_child = optimal_child;
+             return
+             %... + [randi(obj.random_init_radius), randi(obj.random_init_radius), 0, 0];
+             if ~obj.checkInPicture(real_child)
+                real_child = l_parent;
+             end
+         end
+         
          function [current_min_energy, current_min] = localMin(obj, self_part_idx, parent_part_idx, l_parent)            
             %{
             init_idx = [randi([1, obj.num_x_buckets]), ...
@@ -166,9 +180,10 @@ classdef PoseEstimator < handle
                         %randi([1, obj.num_scale_buckets])];
             current_min = 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
              %}
-            current_min = l_parent;
-            current_min_energy = obj.calcEnergy(self_part_idx, current_min, parent_part_idx, l_parent);            
-            while true                
+            current_min = obj.sampleFromParent(self_part_idx, parent_part_idx, l_parent);
+            %current_min = l_parent;
+            current_min_energy = obj.calcEnergy(self_part_idx, current_min, parent_part_idx, l_parent);              
+            while true
                 neighbors1 = repmat(current_min, [4, 1]) - eye(4) .* diag(obj.step_size);
                 neighbors2 = repmat(current_min, [4, 1]) + eye(4) .* diag(obj.step_size);
                 all_neighbors = [neighbors1; neighbors2];
@@ -183,7 +198,7 @@ classdef PoseEstimator < handle
                     current_min = all_neighbors(best_idx - 1, :);
                 else
                     %current_min
-                    %l_parent
+                    %l_parent                                        
                     return;
                 end
             end            
@@ -198,14 +213,26 @@ classdef PoseEstimator < handle
                                  ys(1: obj.num_y_buckets), ...
                                  thetas(1: obj.num_theta_buckets), ...
                                  scales(1: obj.num_scale_buckets)).';
-                             
-            for i = 1: size(all_combos, 1)
-                fprintf('Part: %d, possiblility %d/%d\n', part_idx, i, ...
-                    obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);                
-                [temp_min_energy, temp_min] = ...
-                    obj.localMin(part_idx, obj.parent_relation{part_idx}, all_combos(i, :));                
-                obj.energy_map{part_idx}(mat2str(all_combos(i, :))) = ...
-                    [temp_min_energy, temp_min];
+            if part_idx == obj.table_set_order(end)
+                for j = 1: size(all_combos, 1)
+                    fprintf('Part: %d, possiblility %d/%d\n', part_idx, j, ...
+                        obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);
+                    total = 0;
+                    for c = 1: numel(obj.child_relation{part_idx})
+                        total = total + ...
+                            obj.energy_map{obj.child_relation{part_idx}(c)}(mat2str(all_combos(j, :)));
+                    end
+                    obj.energy_map{part_idx}(mat2str(all_combos(j, :))) = total;
+                end
+            else
+                for i = 1: size(all_combos, 1)
+                    fprintf('Part: %d, possiblility %d/%d\n', part_idx, i, ...
+                        obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);                
+                    [temp_min_energy, temp_min] = ...
+                        obj.localMin(part_idx, obj.parent_relation{part_idx}, all_combos(i, :));                
+                    obj.energy_map{part_idx}(mat2str(all_combos(i, :))) = ...
+                        [temp_min_energy, temp_min];
+                end
             end
          end
          
@@ -249,16 +276,18 @@ classdef PoseEstimator < handle
             end
          end
          
-         function coor = changeBase(obj, location, part_idx) %[x1,x2,y1,y2]
+         %coor is in format [x1,x2,y1,y2]
+         function coor = changeBase(obj, location, part_idx)
             stick_len = location(4) * obj.model_len(part_idx);
-            dx = 0.5 * stick_len * cos(location(3));
-            dy = 0.5 * stick_len * sin(location(3));
-            if location(3) < 0
-                coor = [location(1) - dx, location(1) + dx, location(2) + dy, location(2) - dy];
-            elseif location(3) > 0
-                coor = [location(1) - dx, location(1) + dx, location(2) - dy, location(2) + dy];
-               
+            if part_idx == 2 || part_idx == 3
+                dx = 0.5 * stick_len * cos(location(3));
+                dy = 0.5 * stick_len * sin(location(3));
+            else
+                dx = 0.5 * stick_len * sin(location(3));
+                dy = 0.5 * stick_len * cos(location(3));
             end
+            coor = [location(1), location(1), location(2), location(2)] ...
+                 + [dx, -dx, dy, -dy];
          end
          
          function reset(obj)

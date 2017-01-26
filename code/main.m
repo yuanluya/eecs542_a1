@@ -15,7 +15,7 @@ child_relation{4} = [];                     %head
 %child_relation{5} = [];                     %head
 %child_relation{6} = [];                     %head
 
-deform_param = [1; 1; 1; 1];
+deform_param = [1.5; 1.5; 1; 1.5];
 deform_param = repmat(deform_param, [1, 4, 4]);
 deform_param = permute(deform_param, [3, 2, 1]);
 
