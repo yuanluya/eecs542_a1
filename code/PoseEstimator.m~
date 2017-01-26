@@ -229,14 +229,14 @@ classdef PoseEstimator < handle
                         parts(obj.table_set_order(j), :) = temp(2: 5);
                     else%root
                         vals = values(obj.energy_map{obj.table_set_order(j)});
-                        [~, idx] = min(vals{:, 5});
+                        [~, idx] = min(vals{:, 5));
                         all_keys = keys(obj.energy_map{obj.table_set_order(j)});
-                        parts(obj.table_set_order(j), :) = eval(all_keys{idx});
+                        parts(obj.table_set_order(j), :) = eval(all_keys(idx));
                     end
                 end
                 %find the child of this part
-                for c = 1: numel(obj.child_relation{obj.table_set_order(j)})
-                    child_part_idx = obj.child_relation{obj.table_set_order(j)}(c);
+                for c = 1: numel(obj.child_relation{obj.table_set_order{j}})
+                    child_part_idx = obj.child_relation{obj.table_set_order{j}}(c);
                     temp = obj.energy_map{child_part_idx} ...
                             (mat2str(parts(obj.table_set_order(j), :)));
                     parts(child_part_idx, :) = temp(2: 5);
