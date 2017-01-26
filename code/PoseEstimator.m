@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 20
-        num_y_buckets = 20
-        num_theta_buckets = 10
-        num_scale_buckets = 5
+        num_x_buckets = 5
+        num_y_buckets = 5
+        num_theta_buckets = 2
+        num_scale_buckets = 2
         model_len = [160, 95, 95, 65, 65, 60];
         
         %[x, y, theta, scale], scale: [0, 2.0]
@@ -249,11 +249,16 @@ classdef PoseEstimator < handle
             end
          end
          
-         function coor = changeBase(obj, location, part_idx)
+         function coor = changeBase(obj, location, part_idx) %[x1,x2,y1,y2]
             stick_len = location(4) * obj.model_len(part_idx);
             dx = 0.5 * stick_len * cos(location(3));
             dy = 0.5 * stick_len * sin(location(3));
-            
+            if location(3) < 0
+                coor = [location(1) - dx, location(1) + dx, location(2) + dy, location(2) - dy];
+            elseif location(3) > 0
+                coor = [location(1) - dx, location(1) + dx, location(2) - dy, location(2) + dy];
+               
+            end
          end
          
          function reset(obj)

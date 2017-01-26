@@ -1,4 +1,3 @@
-startup;
 ideal_parameters = cell(4, 1);
 ideal_parameters{1} = [0, 80, 0, 1];        %torso
 ideal_parameters{2} = [-47.5, 20, 0, 1];    %left upper arm
@@ -21,9 +20,9 @@ deform_param = permute(deform_param, [3, 2, 1]);
 
 a = PoseEstimator(ideal_parameters, [2, 3, 4, 1], child_relation, deform_param);
 proposed_parts = a.estimate('000063.jpg');
-[parts, ~] = size(proposed_parts);
-sticks = zeros(4, parts);
-for i = 1: parts
-    sticks(:, i) = a.changeBase(proposed_parts(i,:), i);
+[~,parts] = size(propoo)
+sticks = zeros(size(proposed_parts));
+for i = 1:numel(proposed_parts)
+    sticks(i,:) = a.changeBase(proposed_parts(i,:),i);
 end
 stick_hdl = DrawStickman(sticks, imread('../buffy_s5e2_original/000063.jpg'));
