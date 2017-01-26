@@ -3,10 +3,11 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 2
-        num_y_buckets = 2
-        num_theta_buckets = 2
-        num_scale_buckets = 2
+        num_x_buckets = 20
+        num_y_buckets = 20
+        num_theta_buckets = 10
+        num_scale_buckets = 5
+        model_len = [160, 95, 95, 65, 65, 60];
         
         %[x, y, theta, scale], scale: [0, 2.0]
         ideal_parameters
@@ -17,11 +18,12 @@ classdef PoseEstimator < handle
         child_relation
         parent_relation
         energy_map
+        match_cost_cache
         
         %need to be tuned
         %[variable X partNum X partNum]
         deform_cost_weights
-        match_cost_weights = 1e-3
+        match_cost_weights = 1
         
         
         %define energy functions
@@ -33,9 +35,6 @@ classdef PoseEstimator < handle
         seq
         img_height
         img_width
-        
-        %match cost cache
-        match_cost_cache
         
      end
      
@@ -115,10 +114,10 @@ classdef PoseEstimator < handle
          %return true if not in image
          function in_or_not = checkInPicture(obj, l_self)
              in_or_not = ~(sum(l_self([1, 2, 4]) > 0) ~= 3 ...
-                        || l_self(3) < 0 ...
+                        || l_self(3) < -pi / 2 ...
                         || l_self(1) > obj.img_width ...
                         || l_self(2) > obj.img_height ...
-                        || l_self(3) > 360 ...
+                        || l_self(3) > pi / 2 ...
                         || l_self(4) > 2);
          end
          
@@ -193,7 +192,7 @@ classdef PoseEstimator < handle
          function updateEnergymap(obj, part_idx)
             xs = (obj.step_size(1) / 2): obj.step_size(1): obj.img_width;
             ys = (obj.step_size(2) / 2): obj.step_size(2): obj.img_height;
-            thetas = (obj.step_size(3) / 2): obj.step_size(3): 360;
+            thetas = (-pi + (obj.step_size(3) / 2)): obj.step_size(3): pi;
             scales = (obj.step_size(4) / 2): obj.step_size(4): 2;
             all_combos = combvec(xs(1: obj.num_x_buckets), ...
                                  ys(1: obj.num_y_buckets), ...
@@ -216,7 +215,7 @@ classdef PoseEstimator < handle
             [obj.img_height, obj.img_width, ~] = size(img);
             obj.step_size = [floor(obj.img_width / obj.num_x_buckets), ...
                              floor(obj.img_height / obj.num_y_buckets), ...
-                             360 / obj.num_theta_buckets, 2 / obj.num_scale_buckets];
+                             (2 * pi) / obj.num_theta_buckets, 2 / obj.num_scale_buckets];
             
             %forward calculate energies
             for i = 1: numel(obj.table_set_order)
@@ -248,6 +247,13 @@ classdef PoseEstimator < handle
                     parts(child_part_idx, :) = temp(2: 5);
                 end
             end
+         end
+         
+         function coor = changeBase(obj, location, part_idx)
+            stick_len = location(4) * obj.model_len(part_idx);
+            dx = 0.5 * stick_len * cos(location(3));
+            dy = 0.5 * stick_len * sin(location(3));
+            
          end
          
          function reset(obj)
