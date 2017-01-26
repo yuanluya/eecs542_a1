@@ -15,7 +15,7 @@ child_relation{4} = [];                     %head
 %child_relation{5} = [];                     %head
 %child_relation{6} = [];                     %head
 
-deform_param = [1.5; 1.5; 1; 1.5];
+deform_param = [5; 5; 1; 1];
 deform_param = repmat(deform_param, [1, 4, 4]);
 deform_param = permute(deform_param, [3, 2, 1]);
 
@@ -26,4 +26,5 @@ sticks = zeros(4, parts);
 for i = 1: parts
     sticks(:, i) = a.changeBase(proposed_parts(i,:), i);
 end
+sticks
 stick_hdl = DrawStickman(sticks, imread('../buffy_s5e2_original/000063.jpg'));
