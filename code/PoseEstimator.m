@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 20
-        num_y_buckets = 20
-        num_theta_buckets = 10
-        num_scale_buckets = 5
+        num_x_buckets = 2
+        num_y_buckets = 2
+        num_theta_buckets = 2
+        num_scale_buckets = 2
         
         %[x, y, theta, scale], scale: [0, 2.0]
         ideal_parameters
@@ -112,15 +112,20 @@ classdef PoseEstimator < handle
             cost = x_diff + y_diff + theta_diff + scale_diff;
          end
          
+         %return true if not in image
+         function in_or_not = checkInPicture(obj, l_self)
+             in_or_not = ~(sum(l_self([1, 2, 4]) > 0) ~= 3 ...
+                        || l_self(3) < 0 ...
+                        || l_self(1) > obj.img_width ...
+                        || l_self(2) > obj.img_height ...
+                        || l_self(3) > 360 ...
+                        || l_self(4) > 2);
+         end
+         
          function energy = calcEnergy(obj, self_part_idx, l_self, ...
                                       parent_part_idx, l_parent)
              %check invalid location
-             if sum(l_self([1, 2, 4]) > 0) ~= 3 ...
-                || l_self(3) < 0 ...
-                || l_self(1) > obj.img_width ...
-                || l_self(2) > obj.img_height ...
-                || l_self(3) > 360 ...
-                || l_self(4) > 2
+             if ~obj.checkInPicture(l_self);
                 energy = inf;
                 return;
              end
@@ -137,10 +142,10 @@ classdef PoseEstimator < handle
              %children
              children_energy = 0;
              for c = 1: numel(obj.child_relation{self_part_idx})
-                assert(obj.energy_map(obj.child_relation{self_part_idx}(c)). ...
-                    isKey(mat2str(l_self)), 'Havent done children parts');
+                assert(isKey(obj.energy_map{obj.child_relation{self_part_idx}(c)}, ...
+                    mat2str(l_self)), 'Havent done children parts');
                 energy_pair = obj.energy_map{obj.child_relation{self_part_idx}(c)}(mat2str(l_self));
-                children_energy = children_energy + energy_pair(0);
+                children_energy = children_energy + energy_pair(1);
              end
              
              %match
@@ -229,15 +234,15 @@ classdef PoseEstimator < handle
                             (mat2str(parts(obj.parent_relation{obj.table_set_order(j)}, :)));
                         parts(obj.table_set_order(j), :) = temp(2: 5);
                     else%root
-                        vals = values(obj.energy_map{obj.table_set_order(j)});
-                        [~, idx] = min(vals(:, 5));
+                        vals = cell2mat(values(obj.energy_map{obj.table_set_order(j)}));
+                        [~, idx] = min(vals(:, 1));
                         all_keys = keys(obj.energy_map{obj.table_set_order(j)});
-                        parts(obj.table_set_order(j), :) = eval(all_keys(idx));
+                        parts(obj.table_set_order(j), :) = eval(all_keys{idx});
                     end
                 end
                 %find the child of this part
-                for c = 1: numel(obj.child_relation{obj.table_set_order{j}})
-                    child_part_idx = obj.child_relation{obj.table_set_order{j}}(c);
+                for c = 1: numel(obj.child_relation{obj.table_set_order(j)})
+                    child_part_idx = obj.child_relation{obj.table_set_order(j)}(c);
                     temp = obj.energy_map{child_part_idx} ...
                             (mat2str(parts(obj.table_set_order(j), :)));
                     parts(child_part_idx, :) = temp(2: 5);

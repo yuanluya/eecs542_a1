@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 25
-        num_y_buckets = 25
-        num_theta_buckets = 20
-        num_scale_buckets = 10
+        num_x_buckets = 20
+        num_y_buckets = 20
+        num_theta_buckets = 10
+        num_scale_buckets = 5
         
         %[x, y, theta, scale], scale: [0, 2.0]
         ideal_parameters
@@ -34,8 +34,8 @@ classdef PoseEstimator < handle
         img_height
         img_width
         
-        %match cost cashe
-        match_cost_cashe
+        %match cost cache
+        match_cost_cache
         
      end
      
@@ -93,10 +93,10 @@ classdef PoseEstimator < handle
                 obj.energy_map{i} = containers.Map();
             end
             
-            %initialize match cost cashe
-            obj.match_cost_cashe = cell(numel(obj.ideal_parameters),1);
-            for j = 1:numel(obj.match_cost_cashe)
-                obj.match_cost_cashe{j} = containers.Map();
+            %initialize match cost cache
+            obj.match_cost_cache = cell(numel(obj.ideal_parameters),1);
+            for j = 1:numel(obj.match_cost_cache)
+                obj.match_cost_cache{j} = containers.Map();
             end
          end
          
@@ -112,15 +112,20 @@ classdef PoseEstimator < handle
             cost = x_diff + y_diff + theta_diff + scale_diff;
          end
          
+         %return true if not in image
+         function in_or_not = checkInPicture(obj, l_self)
+             in_or_not = ~(sum(l_self([1, 2, 4]) > 0) ~= 3 ...
+                        || l_self(3) < 0 ...
+                        || l_self(1) > obj.img_width ...
+                        || l_self(2) > obj.img_height ...
+                        || l_self(3) > 360 ...
+                        || l_self(4) > 2);
+         end
+         
          function energy = calcEnergy(obj, self_part_idx, l_self, ...
                                       parent_part_idx, l_parent)
              %check invalid location
-             if sum(l_self([1, 2, 4]) > 0) ~= 3 ...
-                || l_self(3) < 0 ...
-                || l_self(1) > obj.img_width ...
-                || l_self(2) > obj.img_height ...
-                || l_self(3) > 360 ...
-                || l_self(4) > 2
+             if ~obj.checkInPicture(l_self);
                 energy = inf;
                 return;
              end
@@ -144,11 +149,11 @@ classdef PoseEstimator < handle
              end
              
              %match
-             if(~isKey(obj.match_cost_cashe{self_part_idx},mat2str(l_self)))
-                 obj.match_cost_cashe{self_part_idx}(mat2str(l_self)) = ...
-                 match_energy_cost(l_self, self_part_idx, obj.seq)
+             if(~isKey(obj.match_cost_cache{self_part_idx},mat2str(l_self)))
+                 obj.match_cost_cache{self_part_idx}(mat2str(l_self)) = ...
+                 match_energy_cost(l_self, self_part_idx, obj.seq);
              end
-             match_energy = obj.match_cost_cashe{self_part_idx}(mat2str(l_self));
+             match_energy = obj.match_cost_cache{self_part_idx}(mat2str(l_self));
              
              %total
              energy = pair_wise_energy + obj.match_cost_weights * match_energy + children_energy;
@@ -174,21 +179,12 @@ classdef PoseEstimator < handle
                 end
                 energies(1) = current_min_energy; %min return first element when equal
                 [current_min_energy, best_idx] = min(energies);
-<<<<<<< HEAD
-                %best_idx
+                
                 if best_idx > 1
                     current_min = all_neighbors(best_idx - 1, :);
                 else
                     %current_min
                     %l_parent
-=======
-                best_idx;
-                if best_idx > 1
-                    current_min = all_neighbors(best_idx - 1, :);
-                else
-                    current_min
-                    l_parent
->>>>>>> 4375e217c325512b08191d72e8efb32067e580aa
                     return;
                 end
             end            
@@ -258,9 +254,8 @@ classdef PoseEstimator < handle
             obj.energy_map = cell(numel(obj.ideal_parameters), 1);
             for i = 1: numel(obj.ideal_parameters)
                 obj.energy_map{i} = containers.Map('ValueType', 'any');
-                obj.ca{i} = containers.Map('ValueType', 'any');
+                obj.match_cost_cache{i} = containers.Map('ValueType', 'any');
             end
-                
          end
      end
 end
