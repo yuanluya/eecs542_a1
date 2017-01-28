@@ -3,13 +3,13 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 5
-        num_y_buckets = 5
-        num_theta_buckets = 3
-        num_scale_buckets = 3
+        num_x_buckets = 20
+        num_y_buckets = 20
+        num_theta_buckets = 10
+        num_scale_buckets = 5
         model_len = [160, 95, 95, 65, 65, 60];
         
-        %[x, y, theta, scale], scale: [0, 2.0]
+        %[x, y, theta, scale], scale: [0.5, 1.5]
         ideal_parameters
         step_size
         
@@ -36,6 +36,7 @@ classdef PoseEstimator < handle
         seq
         img_height
         img_width
+        lF
         
      end
      
@@ -44,6 +45,7 @@ classdef PoseEstimator < handle
             
             all_names = dir(obj.image_dir);
             obj.all_names = containers.Map();
+            obj.lF = ReadStickmenAnnotationTxt('../data/buffy_s5e2_sticks.txt');
             counter = 0;
             for n = 1: numel(all_names)
                 if length(all_names(n).name) ~= 10
@@ -119,7 +121,8 @@ classdef PoseEstimator < handle
                         || l_self(1) > obj.img_width ...
                         || l_self(2) > obj.img_height ...
                         || l_self(3) > pi / 2 ...
-                        || l_self(4) > 2);
+                        || l_self(4) > 1.5...
+                        || l_self(4)<0.5);
          end
          
          function energy = calcEnergy(obj, self_part_idx, l_self, ...
@@ -150,13 +153,13 @@ classdef PoseEstimator < handle
              
              %match
              if(~isKey(obj.match_cost_cache{self_part_idx},mat2str(l_self)))
-                 match_energy = obj.match_cost_weights * match_energy_cost(l_self, self_part_idx, obj.seq);
+                 match_energy = obj.match_cost_weights * match_energy_cost(l_self, self_part_idx, obj.seq,obj.lF);
                  obj.match_cost_cache{self_part_idx}(mat2str(l_self)) = match_energy;
              else
                 match_energy = obj.match_cost_cache{self_part_idx}(mat2str(l_self));
              end
              %total
-             fprintf('match cost: %f\tdeform cost: %f\n', match_energy, pair_wise_energy);
+             %fprintf('match cost: %f\tdeform cost: %f\n', match_energy, pair_wise_energy);
              energy = pair_wise_energy + match_energy + children_energy;
          end
          
@@ -211,7 +214,7 @@ classdef PoseEstimator < handle
             xs = (obj.step_size(1) / 2): obj.step_size(1): obj.img_width;
             ys = (obj.step_size(2) / 2): obj.step_size(2): obj.img_height;
             thetas = (-pi + (obj.step_size(3) / 2)): obj.step_size(3): pi;
-            scales = (obj.step_size(4) / 2): obj.step_size(4): 2;
+            scales = 0.5: obj.step_size(4): 1.5;
             all_combos = combvec(xs(1: obj.num_x_buckets), ...
                                  ys(1: obj.num_y_buckets), ...
                                  thetas(1: obj.num_theta_buckets), ...
@@ -249,7 +252,7 @@ classdef PoseEstimator < handle
             [obj.img_height, obj.img_width, ~] = size(img);
             obj.step_size = [floor(obj.img_width / obj.num_x_buckets), ...
                              floor(obj.img_height / obj.num_y_buckets), ...
-                             (2 * pi) / obj.num_theta_buckets, 2 / obj.num_scale_buckets];
+                             (2 * pi) / obj.num_theta_buckets, 1 / (obj.num_scale_buckets-1)];
             
             %forward calculate energies
             for i = 1: numel(obj.table_set_order)
