@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 5
-        num_y_buckets = 5
-        num_theta_buckets = 3
-        num_scale_buckets = 3
+        num_x_buckets = 10
+        num_y_buckets = 10
+        num_theta_buckets = 5
+        num_scale_buckets = 10
         model_len = [160, 95, 95, 65, 65, 60];
         
         %[x, y, theta, scale], scale: [0, 2.0]
@@ -24,7 +24,7 @@ classdef PoseEstimator < handle
         %[variable X partNum X partNum]
         deform_cost_weights
         random_init_radius = [-0, 0]
-        match_cost_weights = 1e-2
+        match_cost_weights = 1
         
         
         %define energy functions
@@ -156,7 +156,7 @@ classdef PoseEstimator < handle
                 match_energy = obj.match_cost_cache{self_part_idx}(mat2str(l_self));
              end
              %total
-             fprintf('match cost: %f\tdeform cost: %f\n', match_energy, pair_wise_energy);
+             %fprintf('match cost: %f\tdeform cost: %f\n', match_energy, pair_wise_energy);
              energy = pair_wise_energy + match_energy + children_energy;
          end
          
