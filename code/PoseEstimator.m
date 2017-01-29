@@ -25,7 +25,7 @@ classdef PoseEstimator < handle
         %[variable X partNum X partNum]
         deform_cost_weights
         random_init_radius = [-0, 0]
-        match_cost_weights = 1
+        match_cost_weights = 1e-2
         
         
         %define energy functions
@@ -104,8 +104,9 @@ classdef PoseEstimator < handle
          end
          
          function cost = deformCost(obj, part_p, part_c, lp, lc)
-            coor_p = obj.changeBase(lp, part_p);
-            coor_c = obj.changeBase(lc, part_c); %x1,x2,y1,y2
+            coor_p = obj.changeBase(lp, part_p, false);
+            coor_c = obj.changeBase(lc, part_c, false); %x1,x2,y1,y2
+            
             coor_C = [coor_c; [coor_c(3: 4), coor_c(1: 2)]];
             dists = bsxfun(@minus, coor_C, coor_p);
             dists = [dists(:, [1, 2]); dists(:, [3, 4])];
@@ -116,13 +117,6 @@ classdef PoseEstimator < handle
                 abs(diff_junct(1));
             y_diff = obj.deform_cost_weights(2, part_p, part_c) * ...
                 abs(diff_junct(2));
-            
-            %{
-            x_diff = obj.deform_cost_weights(1, part_p, part_c) * ...
-                abs(lc(1) - lp(1) - obj.ideal_parameters{1}(part_p, part_c));
-            y_diff = obj.deform_cost_weights(2, part_p, part_c) * ...
-                abs(lc(2) - lp(2) - obj.ideal_parameters{2}(part_p,part_c)); 
-            %}
             theta_diff = obj.deform_cost_weights(3, part_p, part_c) * ...
                 abs(lc(3) - lp(3) - obj.ideal_parameters{3}(part_p, part_c));
             scale_diff = obj.deform_cost_weights(4, part_p, part_c) * ...
@@ -169,7 +163,11 @@ classdef PoseEstimator < handle
              
              %match
              if(~isKey(obj.match_cost_cache{self_part_idx},mat2str(l_self)))
-                 match_energy = obj.match_cost_weights * match_energy_cost(l_self, self_part_idx, obj.seq, obj.lF);
+                 fixed_part_id = self_part_idx;
+                 if fixed_part_id == 4
+                     fixed_part_id = 6;
+                 end
+                 match_energy = obj.match_cost_weights * match_energy_cost(l_self, fixed_part_id, obj.seq, obj.lF);
                  obj.match_cost_cache{self_part_idx}(mat2str(l_self)) = match_energy;
              else
                 match_energy = obj.match_cost_cache{self_part_idx}(mat2str(l_self));
@@ -181,8 +179,6 @@ classdef PoseEstimator < handle
          
          
          function real_child = sampleFromParent(obj, self_part_idx, parent_part_idx, l_parent)
-             optimal_child = [l_parent(1) + obj.ideal_parameters{1}(parent_part_idx, self_part_idx), ...
-                              l_parent(2) + obj.ideal_parameters{2}(parent_part_idx, self_part_idx), 0, 1];
              %random sample from optimal_child
              real_child = optimal_child;
              return
@@ -193,14 +189,13 @@ classdef PoseEstimator < handle
          end
          
          function [current_min_energy, current_min] = localMin(obj, self_part_idx, parent_part_idx, l_parent)            
-            %{
             init_idx = [randi([1, obj.num_x_buckets]), ...
-                        randi([1, obj.num_x_buckets]), 1, 1];
+                        randi([1, obj.num_x_buckets]), 0, 1];
                         %randi([1, obj.num_theta_buckets]), ...
                         %randi([1, obj.num_scale_buckets])];
             current_min = 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
-             %}
-            current_min = obj.sampleFromParent(self_part_idx, parent_part_idx, l_parent);
+            
+            %current_min = obj.sampleFromParent(self_part_idx, parent_part_idx, l_parent);
             %current_min = l_parent;
             current_min_energy = obj.calcEnergy(self_part_idx, current_min, parent_part_idx, l_parent);    
             while true
@@ -219,7 +214,7 @@ classdef PoseEstimator < handle
                     current_min = all_neighbors(best_idx - 1, :);
                 else
                     %current_min
-                    %l_parent 
+                    %l_parent
                     return;
                 end
                 
@@ -229,7 +224,7 @@ classdef PoseEstimator < handle
          function updateEnergymap(obj, part_idx)
             xs = (obj.step_size(1) / 2): obj.step_size(1): obj.img_width;
             ys = (obj.step_size(2) / 2): obj.step_size(2): obj.img_height;
-            thetas = (-pi + (obj.step_size(3) / 2)): obj.step_size(3): pi;
+            thetas = (-pi / 2 + (obj.step_size(3) / 2)): obj.step_size(3): pi / 2;
             scales = 0.5: obj.step_size(4): 1.5;
             all_combos = combvec(xs(1: obj.num_x_buckets), ...
                                  ys(1: obj.num_y_buckets), ...
@@ -243,9 +238,11 @@ classdef PoseEstimator < handle
                     end
                     total = 0;
                     for c = 1: numel(obj.child_relation{part_idx})
-                        total = total + ...
-                            obj.energy_map{obj.child_relation{part_idx}(c)}(mat2str(all_combos(j, :)));
+                        minimal = obj.energy_map{obj.child_relation{part_idx}(c)}(mat2str(all_combos(j, :)));
+                        total = total + minimal(1);
+                            
                     end
+                    total = total + obj.match_cost(all_combos(j, :), part_idx, obj.seq, obj.lF);
                     obj.energy_map{part_idx}(mat2str(all_combos(j, :))) = total;
                 end
             else
@@ -269,7 +266,7 @@ classdef PoseEstimator < handle
             [obj.img_height, obj.img_width, ~] = size(img);
             obj.step_size = [floor(obj.img_width / obj.num_x_buckets), ...
                              floor(obj.img_height / obj.num_y_buckets), ...
-                             (2 * pi) / obj.num_theta_buckets, 1 / (obj.num_scale_buckets-1)];
+                             pi / obj.num_theta_buckets, 1 / (obj.num_scale_buckets-1)];
             
             %forward calculate energies
             for i = 1: numel(obj.table_set_order)
@@ -287,7 +284,7 @@ classdef PoseEstimator < handle
                         parts(obj.table_set_order(j), :) = temp(2: 5);
                     else%root
                         vals = cell2mat(values(obj.energy_map{obj.table_set_order(j)}));
-                        [~, idx] = min(vals(:, 1));
+                        [~, idx] = min(vals);
                         all_keys = keys(obj.energy_map{obj.table_set_order(j)});
                         parts(obj.table_set_order(j), :) = eval(all_keys{idx});
                     end
@@ -303,7 +300,7 @@ classdef PoseEstimator < handle
          end
          
          %coor is in format [x1,x2,y1,y2]
-         function coor = changeBase(obj, location, part_idx) 
+         function coor = changeBase(obj, location, part_idx, draw) 
             stick_len = location(4) * obj.model_len(part_idx);
             if part_idx == 2 || part_idx == 3
                 dx = 0.5 * stick_len * cos(location(3));
@@ -314,6 +311,9 @@ classdef PoseEstimator < handle
             end
             coor = [location(1), location(1), location(2), location(2)] ...
                  + [dx, -dx, dy, -dy];
+            if ~draw
+                coor = [coor(1), coor(3), coor(2), coor(4)];
+            end
          end
          
          function reset(obj)

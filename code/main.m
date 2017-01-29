@@ -15,16 +15,24 @@ child_relation{4} = [];                     %head
 %child_relation{5} = [];                     %head
 %child_relation{6} = [];                     %head
 
-deform_param = [5; 5; 1; 100];
+deform_param = ...
+[
+  []; %x
+  []; %y
+  []; %theta
+  []; %scale
+];
+
+deform_param = [0; 0; 0; 0];
 deform_param = repmat(deform_param, [1, 4, 4]);
 deform_param = permute(deform_param, [3, 2, 1]);
 
 a = PoseEstimator(ideal_parameters, [2, 3, 4, 1], child_relation, deform_param);
-proposed_parts = a.estimate('000063.jpg');
+proposed_parts = a.estimate('000063.jpg')
 [parts, ~] = size(proposed_parts);
 sticks = zeros(4, parts);
 for i = 1: parts
-    sticks(:, i) = a.changeBase(proposed_parts(i,:), i);
+    sticks(:, i) = a.changeBase(proposed_parts(i,:), i, true);
 end
 sticks
 stick_hdl = DrawStickman(sticks, imread('../buffy_s5e2_original/000063.jpg'));
