@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 20
-        num_y_buckets = 20
-        num_theta_buckets = 10
-        num_scale_buckets = 5
+        num_x_buckets = 10
+        num_y_buckets = 10
+        num_theta_buckets = 3
+        num_scale_buckets = 3
         %model_len = [160, 95, 95, 65, 65, 60];
         model_len = [160, 95, 95, 60];
         
@@ -105,7 +105,7 @@ classdef PoseEstimator < handle
          
          function cost = deformCost(obj, part_p, part_c, lp, lc)
             coor_p = obj.changeBase(lp, part_p);
-            coor_c = obj.changeBase(lc, part_c);
+            coor_c = obj.changeBase(lc, part_c); %x1,x2,y1,y2
             coor_C = [coor_c; [coor_c(3: 4), coor_c(1: 2)]];
             dists = bsxfun(@minus, coor_C, coor_p);
             dists = [dists(:, [1, 2]); dists(:, [3, 4])];
@@ -113,9 +113,16 @@ classdef PoseEstimator < handle
             diff_junct = dists(I, :);
             
             x_diff = obj.deform_cost_weights(1, part_p, part_c) * ...
+                abs(diff_junct(1));
+            y_diff = obj.deform_cost_weights(2, part_p, part_c) * ...
+                abs(diff_junct(2));
+            
+            %{
+            x_diff = obj.deform_cost_weights(1, part_p, part_c) * ...
                 abs(lc(1) - lp(1) - obj.ideal_parameters{1}(part_p, part_c));
             y_diff = obj.deform_cost_weights(2, part_p, part_c) * ...
-                abs(lc(2) - lp(2) - obj.ideal_parameters{2}(part_p, part_c));
+                abs(lc(2) - lp(2) - obj.ideal_parameters{2}(part_p,part_c)); 
+            %}
             theta_diff = obj.deform_cost_weights(3, part_p, part_c) * ...
                 abs(lc(3) - lp(3) - obj.ideal_parameters{3}(part_p, part_c));
             scale_diff = obj.deform_cost_weights(4, part_p, part_c) * ...
@@ -193,7 +200,6 @@ classdef PoseEstimator < handle
                         %randi([1, obj.num_scale_buckets])];
             current_min = 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
              %}
-            
             current_min = obj.sampleFromParent(self_part_idx, parent_part_idx, l_parent);
             %current_min = l_parent;
             current_min_energy = obj.calcEnergy(self_part_idx, current_min, parent_part_idx, l_parent);    
@@ -203,7 +209,8 @@ classdef PoseEstimator < handle
                 all_neighbors = [neighbors1; neighbors2];
                 energies = zeros(9, 1);
                 for i = 2: 9
-                    energies(i) = obj.calcEnergy(self_part_idx, all_neighbors(i - 1, :), parent_part_idx, l_parent);
+                    energies(i) = obj.calcEnergy(...
+                        self_part_idx, all_neighbors(i - 1, :), parent_part_idx, l_parent);
                 end
                 energies(1) = current_min_energy; %min return first element when equal
                 [current_min_energy, best_idx] = min(energies);
@@ -212,7 +219,7 @@ classdef PoseEstimator < handle
                     current_min = all_neighbors(best_idx - 1, :);
                 else
                     %current_min
-                    %l_parent  
+                    %l_parent 
                     return;
                 end
                 
@@ -253,6 +260,7 @@ classdef PoseEstimator < handle
                         [temp_min_energy, temp_min];
                 end
             end
+            
          end
          
          function parts = estimate(obj, seq)

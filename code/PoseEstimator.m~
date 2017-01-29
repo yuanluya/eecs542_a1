@@ -105,19 +105,22 @@ classdef PoseEstimator < handle
          
          function cost = deformCost(obj, part_p, part_c, lp, lc)
             coor_p = obj.changeBase(lp, part_p);
-            coor_c = obj.changeBase(lc, part_c);
-            coor_c_ = [coor_c(3), coor_c(4), coor_c(1), coor_c(2)];
-            coor_C = [coor_c; coor_c_];
+            coor_c = obj.changeBase(lc, part_c); %x1,x2,y1,y2
+            coor_C = [coor_c; [coor_c(3: 4), coor_c(1: 2)]];
             dists = bsxfun(@minus, coor_C, coor_p);
             dists = [dists(:, [1, 2]); dists(:, [3, 4])];
-            dists_2 = min(sum(dists .^ 2, 2);
-            [~, I] = min(dists_2);
+            [~, I] = min(sum(dists .^ 2, 2));
             diff_junct = dists(I, :);
             
+            x_diff = abs(diff_junct(1));
+            y_diff = abs(diff_junct(2));
+            %{
             x_diff = obj.deform_cost_weights(1, part_p, part_c) * ...
                 abs(lc(1) - lp(1) - obj.ideal_parameters{1}(part_p, part_c));
             y_diff = obj.deform_cost_weights(2, part_p, part_c) * ...
-                abs(lc(2) - lp(2) - obj.ideal_parameters{2}(part_p, part_c));
+                abs(lc(2) - lp(2) - obj.ideal_parameters{2}(part_p,
+                part_c)); %}
+            
             theta_diff = obj.deform_cost_weights(3, part_p, part_c) * ...
                 abs(lc(3) - lp(3) - obj.ideal_parameters{3}(part_p, part_c));
             scale_diff = obj.deform_cost_weights(4, part_p, part_c) * ...
