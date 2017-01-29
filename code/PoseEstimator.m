@@ -7,7 +7,8 @@ classdef PoseEstimator < handle
         num_y_buckets = 20
         num_theta_buckets = 10
         num_scale_buckets = 5
-        model_len = [160, 95, 95, 65, 65, 60];
+        %model_len = [160, 95, 95, 65, 65, 60];
+        model_len = [160, 95, 95, 60];
         
         %[x, y, theta, scale], scale: [0.5, 1.5]
         ideal_parameters
@@ -103,6 +104,14 @@ classdef PoseEstimator < handle
          end
          
          function cost = deformCost(obj, part_p, part_c, lp, lc)
+            coor_p = obj.changeBase(lp, part_p);
+            coor_c = obj.changeBase(lc, part_c);
+            coor_C = [coor_c; [coor_c(3: 4), coor_c(1: 2)]];
+            dists = bsxfun(@minus, coor_C, coor_p);
+            dists = [dists(:, [1, 2]); dists(:, [3, 4])];
+            [~, I] = min(sum(dists .^ 2, 2));
+            diff_junct = dists(I, :);
+            
             x_diff = obj.deform_cost_weights(1, part_p, part_c) * ...
                 abs(lc(1) - lp(1) - obj.ideal_parameters{1}(part_p, part_c));
             y_diff = obj.deform_cost_weights(2, part_p, part_c) * ...
@@ -116,13 +125,13 @@ classdef PoseEstimator < handle
          
          %return true if not in image
          function in_or_not = checkInPicture(obj, l_self)
-             in_or_not = ~(sum(l_self([1, 2, 4]) > 0) ~= 3 ...
+             in_or_not = ~(sum(l_self([1, 2]) > 0) ~= 2 ...
                         || l_self(3) < -pi / 2 ...
                         || l_self(1) > obj.img_width ...
                         || l_self(2) > obj.img_height ...
                         || l_self(3) > pi / 2 ...
                         || l_self(4) > 1.5...
-                        || l_self(4)<0.5);
+                        || l_self(4) < 0.5);
          end
          
          function energy = calcEnergy(obj, self_part_idx, l_self, ...
@@ -153,7 +162,7 @@ classdef PoseEstimator < handle
              
              %match
              if(~isKey(obj.match_cost_cache{self_part_idx},mat2str(l_self)))
-                 match_energy = obj.match_cost_weights * match_energy_cost(l_self, self_part_idx, obj.seq,obj.lF);
+                 match_energy = obj.match_cost_weights * match_energy_cost(l_self, self_part_idx, obj.seq, obj.lF);
                  obj.match_cost_cache{self_part_idx}(mat2str(l_self)) = match_energy;
              else
                 match_energy = obj.match_cost_cache{self_part_idx}(mat2str(l_self));
@@ -286,7 +295,7 @@ classdef PoseEstimator < handle
          end
          
          %coor is in format [x1,x2,y1,y2]
-         function coor = changeBase(obj, location, part_idx)
+         function coor = changeBase(obj, location, part_idx) 
             stick_len = location(4) * obj.model_len(part_idx);
             if part_idx == 2 || part_idx == 3
                 dx = 0.5 * stick_len * cos(location(3));
