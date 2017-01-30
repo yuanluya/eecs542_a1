@@ -113,14 +113,14 @@ classdef PoseEstimator < handle
             [~, I] = min(sum(dists .^ 2, 2));
             diff_junct = dists(I, :);
             
-            x_diff = obj.deform_cost_weights(1, part_p, part_c) * ...
+            x_diff = obj.deform_cost_weights(part_p, part_c, 1) * ...
                 abs(diff_junct(1));
-            y_diff = obj.deform_cost_weights(2, part_p, part_c) * ...
+            y_diff = obj.deform_cost_weights(part_p, part_c, 2) * ...
                 abs(diff_junct(2));
-            theta_diff = obj.deform_cost_weights(3, part_p, part_c) * ...
-                abs(lc(3) - lp(3) - obj.ideal_parameters{3}(part_p, part_c));
-            scale_diff = obj.deform_cost_weights(4, part_p, part_c) * ...
-                abs(log(lc(4)) - log(lp(4)) - log(obj.ideal_parameters{4}(part_p, part_c)));
+            theta_diff = obj.deform_cost_weights(part_p, part_c, 3) * ...
+                abs(lc(3) - lp(3));
+            scale_diff = obj.deform_cost_weights(part_p, part_c, 4) * ...
+                abs(log(lc(4)) - log(lp(4)));
             cost = x_diff + y_diff + theta_diff + scale_diff;
          end
          
@@ -236,13 +236,7 @@ classdef PoseEstimator < handle
                         fprintf('Part: %d, possiblility %d/%d\n', part_idx, j, ...
                             obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);
                     end
-                    total = 0;
-                    for c = 1: numel(obj.child_relation{part_idx})
-                        minimal = obj.energy_map{obj.child_relation{part_idx}(c)}(mat2str(all_combos(j, :)));
-                        total = total + minimal(1);
-                            
-                    end
-                    total = total + obj.match_cost(all_combos(j, :), part_idx, obj.seq, obj.lF);
+                    total = obj.calcEnergy(part_idx, all_combos(j, :), [], []);
                     obj.energy_map{part_idx}(mat2str(all_combos(j, :))) = total;
                 end
             else
