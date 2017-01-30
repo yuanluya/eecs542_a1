@@ -32,7 +32,7 @@ proposed_parts = a.estimate('000063.jpg')
 [parts, ~] = size(proposed_parts);
 sticks = zeros(4, parts);
 for i = 1: parts
-    sticks(:, i) = a.changeBase(proposed_parts(i,:), i, true);
+    sticks(:, i) = a.changeBase(proposed_parts(i,:), i);
 end
 sticks
 stick_hdl = DrawStickman(sticks, imread('../buffy_s5e2_original/000063.jpg'));

@@ -3,7 +3,7 @@ function hdl = DrawStickman(sticks, img, colors, thickness, drawidx, drawfullske
 % Overlays segments in 'sticks' on image 'img'
 %
 % Input:
-%  - sticks: matrix [4, nparts]. sticks(:,i) --> (x1, x2, y1, y2)' 
+%  - sticks: matrix [4, nparts]. sticks(:,i) --> (x1, y1, x2, y2)' 
 %  - img: image to show. Can be [].
 %  - colors - vector 3x1 then use the specified color for all sticks 
 %              or 3xN then color per body part

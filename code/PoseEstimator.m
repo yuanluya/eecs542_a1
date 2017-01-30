@@ -104,8 +104,8 @@ classdef PoseEstimator < handle
          end
          
          function cost = deformCost(obj, part_p, part_c, lp, lc)
-            coor_p = obj.changeBase(lp, part_p, false);
-            coor_c = obj.changeBase(lc, part_c, false); %x1,x2,y1,y2
+            coor_p = obj.changeBase(lp, part_p);
+            coor_c = obj.changeBase(lc, part_c); %x1,x2,y1,y2
             
             coor_C = [coor_c; [coor_c(3: 4), coor_c(1: 2)]];
             dists = bsxfun(@minus, coor_C, coor_p);
@@ -294,7 +294,7 @@ classdef PoseEstimator < handle
          end
          
          %coor is in format [x1,x2,y1,y2]
-         function coor = changeBase(obj, location, part_idx, draw) 
+         function coor = changeBase(obj, location, part_idx) 
             stick_len = location(4) * obj.model_len(part_idx);
             if part_idx == 2 || part_idx == 3
                 dx = 0.5 * stick_len * cos(location(3));
@@ -303,11 +303,8 @@ classdef PoseEstimator < handle
                 dx = 0.5 * stick_len * sin(location(3));
                 dy = 0.5 * stick_len * cos(location(3));
             end
-            coor = [location(1), location(1), location(2), location(2)] ...
-                 + [dx, -dx, dy, -dy];
-            if ~draw
-                coor = [coor(1), coor(3), coor(2), coor(4)];
-            end
+            coor = [location(1), location(2), location(1), location(2)] ...
+                 + [dx, dy, -dx, -dy];
          end
          
          function reset(obj)
