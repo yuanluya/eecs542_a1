@@ -9,6 +9,10 @@ classdef PoseEstimator < handle
         num_scale_buckets = 5
         %model_len = [160, 95, 95, 65, 65, 60];
         model_len = [160, 95, 95, 60];
+        min_scale = 0.5
+        max_scale = 1.5
+        min_theta = -pi / 2
+        max_theta = pi / 2
         
         %[x, y, theta, scale], scale: [0.5, 1.5]
         ideal_parameters
@@ -127,18 +131,18 @@ classdef PoseEstimator < handle
          %return true if not in image
          function in_or_not = checkInPicture(obj, l_self)
              in_or_not = ~(sum(l_self([1, 2]) > 0) ~= 2 ...
-                        || l_self(3) < -pi / 2 ...
+                        || l_self(3) < obj.min_theta ...
                         || l_self(1) > obj.img_width ...
                         || l_self(2) > obj.img_height ...
-                        || l_self(3) > pi / 2 ...
-                        || l_self(4) > 1.5...
-                        || l_self(4) < 0.5);
+                        || l_self(3) > obj.max_theta ...
+                        || l_self(4) > obj.max_scale...
+                        || l_self(4) < obj.min_scale);
          end
          
          function energy = calcEnergy(obj, self_part_idx, l_self, ...
                                       parent_part_idx, l_parent)
              %check invalid location
-             if ~obj.checkInPicture(l_self);
+             if ~obj.checkInPicture(l_self)
                 energy = inf;
                 return;
              end
@@ -195,7 +199,8 @@ classdef PoseEstimator < handle
                         floor(obj.num_theta_buckets / 2), floor(obj.num_scale_buckets / 2)];
                         %randi([1, obj.num_theta_buckets]), ...
                         %randi([1, obj.num_scale_buckets])];
-            current_min = 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
+            current_min = [0, 0, obj.min_theta, obj.min_scale] ...
+                + 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
             
             %current_min = obj.sampleFromParent(self_part_idx, parent_part_idx, l_parent);
             %current_min = l_parent;
