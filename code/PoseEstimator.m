@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 10
-        num_y_buckets = 10
-        num_theta_buckets = 3
-        num_scale_buckets = 3
+        num_x_buckets = 15
+        num_y_buckets = 15
+        num_theta_buckets = 5
+        num_scale_buckets = 5
         %model_len = [160, 95, 95, 65, 65, 60];
         model_len = [160, 95, 95, 60];
         
@@ -25,7 +25,7 @@ classdef PoseEstimator < handle
         %[variable X partNum X partNum]
         deform_cost_weights
         random_init_radius = [-0, 0]
-        match_cost_weights = 1e-2
+        match_cost_weights = 1
         
         
         %define energy functions
@@ -189,8 +189,10 @@ classdef PoseEstimator < handle
          end
          
          function [current_min_energy, current_min] = localMin(obj, self_part_idx, parent_part_idx, l_parent)            
+            
             init_idx = [randi([1, obj.num_x_buckets]), ...
-                        randi([1, obj.num_x_buckets]), 0, 1];
+                        randi([1, obj.num_y_buckets]), ...
+                        floor(obj.num_theta_buckets / 2), floor(obj.num_scale_buckets / 2)];
                         %randi([1, obj.num_theta_buckets]), ...
                         %randi([1, obj.num_scale_buckets])];
             current_min = 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
@@ -260,7 +262,7 @@ classdef PoseEstimator < handle
             [obj.img_height, obj.img_width, ~] = size(img);
             obj.step_size = [floor(obj.img_width / obj.num_x_buckets), ...
                              floor(obj.img_height / obj.num_y_buckets), ...
-                             pi / obj.num_theta_buckets, 1 / (obj.num_scale_buckets-1)];
+                             pi / obj.num_theta_buckets, 1 / obj.num_scale_buckets];
             
             %forward calculate energies
             for i = 1: numel(obj.table_set_order)

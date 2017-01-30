@@ -15,16 +15,29 @@ child_relation{4} = [];                     %head
 %child_relation{5} = [];                     %head
 %child_relation{6} = [];                     %head
 
+%A_ij means relation between parent i, child j
 deform_param = ...
 [
-  []; %x
-  []; %y
-  []; %theta
-  []; %scale
+  [1, 1, 1, 1; 
+   0, 0, 0, 0; 
+   0, 0, 0, 0; 
+   0, 0, 0, 0]; %x
+  [1, 1, 1, 1;
+   0, 0, 0, 0; 
+   0, 0, 0, 0; 
+   0, 0, 0, 0]; %y
+  [0.5, 0.5, 0.5, 0.5;
+   0, 0, 0, 0; 
+   0, 0, 0, 0; 
+   0, 0, 0, 0]; %theta
+  [1, 1, 1, 1;
+   0, 0, 0, 0; 
+   0, 0, 0, 0; 
+   0, 0, 0, 0]; %scale
 ];
 
-deform_param = [0; 0; 0; 0];
-deform_param = repmat(deform_param, [1, 4, 4]);
+%deform_param = [0.1; 0.1; 0.1; 0.1];
+%deform_param = repmat(deform_param, [1, 4, 4]);
 deform_param = permute(deform_param, [3, 2, 1]);
 
 a = PoseEstimator(ideal_parameters, [2, 3, 4, 1], child_relation, deform_param);
