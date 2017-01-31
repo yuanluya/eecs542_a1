@@ -5,8 +5,8 @@ classdef PoseEstimator < handle
         num_parts = 4
         num_x_buckets = 15
         num_y_buckets = 15
-        num_theta_buckets = 5
-        num_scale_buckets = 5
+        num_theta_buckets = 3
+        num_scale_buckets = 3
         %model_len = [160, 95, 95, 65, 65, 60];
         model_len = [160, 95, 95, 60];
         min_scale = 0.5
@@ -199,11 +199,11 @@ classdef PoseEstimator < handle
                         floor(obj.num_theta_buckets / 2), floor(obj.num_scale_buckets / 2)];
                         %randi([1, obj.num_theta_buckets]), ...
                         %randi([1, obj.num_scale_buckets])];
-            current_min = [0, 0, obj.min_theta, obj.min_scale] ...
-                + 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
+            %current_min = [0, 0, obj.min_theta, obj.min_scale] ...
+            %    + 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
             
             %current_min = obj.sampleFromParent(self_part_idx, parent_part_idx, l_parent);
-            %current_min = l_parent;
+            current_min = l_parent;
             current_min_energy = obj.calcEnergy(self_part_idx, current_min, parent_part_idx, l_parent);    
             while true
                 neighbors1 = repmat(current_min, [4, 1]) - eye(4) .* diag(obj.step_size);
