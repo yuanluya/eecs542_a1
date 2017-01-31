@@ -3,9 +3,9 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 15
-        num_y_buckets = 15
-        num_theta_buckets = 5
+        num_x_buckets = 25
+        num_y_buckets = 25
+        num_theta_buckets = 15
         num_scale_buckets = 5
         %model_len = [160, 95, 95, 65, 65, 60];
         model_len = [160, 95, 95, 60];
@@ -24,12 +24,13 @@ classdef PoseEstimator < handle
         parent_relation
         energy_map
         match_cost_cache
+        last_optimal
         
         %need to be tuned
         %[variable X partNum X partNum]
         deform_cost_weights
         random_init_radius = [-0, 0]
-        match_cost_weights = 1
+        match_cost_weights = 1e-1
         
         
         %define energy functions
@@ -194,13 +195,15 @@ classdef PoseEstimator < handle
          
          function [current_min_energy, current_min] = localMin(obj, self_part_idx, parent_part_idx, l_parent)            
             
-            init_idx = [randi([1, obj.num_x_buckets]), ...
-                        randi([1, obj.num_y_buckets]), ...
-                        floor(obj.num_theta_buckets / 2), floor(obj.num_scale_buckets / 2)];
-                        %randi([1, obj.num_theta_buckets]), ...
-                        %randi([1, obj.num_scale_buckets])];
-            current_min = [0, 0, obj.min_theta, obj.min_scale] ...
-                + 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
+            if isnan(obj.last_optimal)
+                init_idx = [randi([1, obj.num_x_buckets]), ...
+                            randi([1, obj.num_y_buckets]), ...
+                            floor(obj.num_theta_buckets / 2), floor(obj.num_scale_buckets / 2)];
+                current_min = [0, 0, obj.min_theta, obj.min_scale] ...
+                    + 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
+            else
+                current_min = obj.last_optimal;
+            end
             
             %current_min = obj.sampleFromParent(self_part_idx, parent_part_idx, l_parent);
             %current_min = l_parent;
@@ -220,7 +223,7 @@ classdef PoseEstimator < handle
                 if best_idx > 1
                     current_min = all_neighbors(best_idx - 1, :);
                 else
-                    %current_min
+                    obj.last_optimal = current_min;
                     %l_parent
                     return;
                 end
@@ -229,6 +232,7 @@ classdef PoseEstimator < handle
          end
          
          function updateEnergymap(obj, part_idx)
+            obj.last_optimal = nan;
             xs = (obj.step_size(1) / 2): obj.step_size(1): obj.img_width;
             ys = (obj.step_size(2) / 2): obj.step_size(2): obj.img_height;
             thetas = (-pi / 2 + (obj.step_size(3) / 2)): obj.step_size(3): pi / 2;

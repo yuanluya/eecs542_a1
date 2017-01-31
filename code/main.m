@@ -26,7 +26,7 @@ deform_param = ...
    0, 0, 0, 0; 
    0, 0, 0, 0; 
    0, 0, 0, 0]; %y
-  [0.5, 0.5, 0.5, 0.5;
+  [0.5, 0.5, 0.5, 1.0;
    0, 0, 0, 0; 
    0, 0, 0, 0; 
    0, 0, 0, 0]; %theta
@@ -38,10 +38,10 @@ deform_param = ...
 
 %deform_param = [0.1; 0.1; 0.1; 0.1];
 %deform_param = repmat(deform_param, [1, 4, 4]);
-deform_param = permute(deform_param, [3, 2, 1]);
+%deform_param = permute(deform_param, [3, 2, 1]);
 
-a = PoseEstimator(ideal_parameters, [2, 3, 4, 1], child_relation, deform_param);
-proposed_parts = a.estimate('000063.jpg')
+a = PoseEstimator(ideal_parameters, [2, 3, 4, 1], child_relation, 1 * deform_param);
+proposed_parts = a.estimate('052582.jpg')
 [parts, ~] = size(proposed_parts);
 sticks = zeros(4, parts);
 for i = 1: parts
