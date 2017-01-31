@@ -3,8 +3,8 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 25
-        num_y_buckets = 25
+        num_x_buckets = 20
+        num_y_buckets = 20
         num_theta_buckets = 15
         num_scale_buckets = 5
         %model_len = [160, 95, 95, 65, 65, 60];
@@ -30,8 +30,7 @@ classdef PoseEstimator < handle
         %[variable X partNum X partNum]
         deform_cost_weights
         random_init_radius = [-0, 0]
-        match_cost_weights = 1e-1
-        
+        match_cost_weights = 1
         
         %define energy functions
         match_cost = @match_energy_cost
