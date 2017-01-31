@@ -3,8 +3,8 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 20
-        num_y_buckets = 20
+        num_x_buckets = 25
+        num_y_buckets = 25
         num_theta_buckets = 15
         num_scale_buckets = 5
         %model_len = [160, 95, 95, 65, 65, 60];
@@ -29,8 +29,8 @@ classdef PoseEstimator < handle
         %need to be tuned
         %[variable X partNum X partNum]
         deform_cost_weights
-        random_init_radius = [-0, 0]
-        match_cost_weights = 1
+        random_radius = 0
+        match_cost_weights = 5e-2
         
         %define energy functions
         match_cost = @match_energy_cost
@@ -201,7 +201,8 @@ classdef PoseEstimator < handle
                 current_min = [0, 0, obj.min_theta, obj.min_scale] ...
                     + 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
             else
-                current_min = obj.last_optimal;
+                current_min = obj.last_optimal;% + ...
+                    %obj.random_radius * obj.step_size .* randi([-1, 1], 1, 4);
             end
             
             %current_min = obj.sampleFromParent(self_part_idx, parent_part_idx, l_parent);

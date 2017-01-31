@@ -17,17 +17,17 @@ child_relation{4} = [];                     %head
 
 %A_ij means relation between parent i, child j
 deform_param = ...
-  [1, 1, 1, 1; 
+  [0, 10, 10, 10; 
    0, 0, 0, 0; 
    0, 0, 0, 0; 
    0, 0, 0, 0]; %x
 deform_param_y = ...
-  [1, 1, 1, 1; 
+  [0, 10, 10, 10; 
    0, 0, 0, 0; 
    0, 0, 0, 0; 
    0, 0, 0, 0]; %y
 deform_param_theta = ...
-  [0.5, 0.5, 0.5, 1.0;
+  [0.5, 0.5, 0.5, 2.0;
    0, 0, 0, 0; 
    0, 0, 0, 0; 
    0, 0, 0, 0]; %theta
@@ -39,10 +39,10 @@ deform_param_scale = ...
 
 deform_param(:, :, 2) = deform_param_y;
 deform_param(:, :, 3) = 100 * deform_param_theta;
-deform_param(:, :, 4) = 100 * deform_param_scale;
+deform_param(:, :, 4) = 300 * deform_param_scale;
 
-a = PoseEstimator(ideal_parameters, [2, 3, 4, 1], child_relation, 0 * deform_param);
-proposed_parts = a.estimate('058918.jpg')
+a = PoseEstimator(ideal_parameters, [2, 3, 4, 1], child_relation, 1 * deform_param);
+proposed_parts = a.estimate('000063.jpg')
 [parts, ~] = size(proposed_parts);
 sticks = zeros(4, parts);
 for i = 1: parts
