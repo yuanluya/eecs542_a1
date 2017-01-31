@@ -29,7 +29,7 @@ classdef PoseEstimator < handle
         %[variable X partNum X partNum]
         deform_cost_weights
         random_init_radius = [-0, 0]
-        match_cost_weights = 1
+        match_cost_weights = 2e-2
         
         
         %define energy functions
