@@ -3,12 +3,11 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 25
-        num_y_buckets = 25
-        num_theta_buckets = 15
+        num_x_buckets = 20
+        num_y_buckets = 20
+        num_theta_buckets = 10
         num_scale_buckets = 5
-        %model_len = [160, 95, 95, 65, 65, 60];
-        model_len = [160, 95, 95, 60];
+        model_len = [160, 95, 95, 65, 65, 60];
         min_scale = 0.5
         max_scale = 1.5
         min_theta = -pi / 2
@@ -109,7 +108,7 @@ classdef PoseEstimator < handle
          
          function cost = deformCost(obj, part_p, part_c, lp, lc)
             coor_p = obj.changeBase(lp, part_p);
-            coor_c = obj.changeBase(lc, part_c); %x1,x2,y1,y2
+            coor_c = obj.changeBase(lc, part_c); %x1,y1,x2,y2
             
             coor_C = [coor_c; [coor_c(3: 4), coor_c(1: 2)]];
             dists = bsxfun(@minus, coor_C, coor_p);
@@ -167,11 +166,7 @@ classdef PoseEstimator < handle
              
              %match
              if(~isKey(obj.match_cost_cache{self_part_idx},mat2str(l_self)))
-                 fixed_part_id = self_part_idx;
-                 if fixed_part_id == 4
-                     fixed_part_id = 6;
-                 end
-                 match_energy = obj.match_cost_weights * match_energy_cost(l_self, fixed_part_id, obj.seq, obj.lF);
+                 match_energy = obj.match_cost_weights * match_energy_cost(l_self, self_part_idx, obj.seq, obj.lF);
                  obj.match_cost_cache{self_part_idx}(mat2str(l_self)) = match_energy;
              else
                 match_energy = obj.match_cost_cache{self_part_idx}(mat2str(l_self));
@@ -236,7 +231,7 @@ classdef PoseEstimator < handle
             xs = (obj.step_size(1) / 2): obj.step_size(1): obj.img_width;
             ys = (obj.step_size(2) / 2): obj.step_size(2): obj.img_height;
             thetas = (-pi / 2 + (obj.step_size(3) / 2)): obj.step_size(3): pi / 2;
-            scales = 0.5: obj.step_size(4): 1.5;
+            scales = 0.5 + obj.step_size(4) / 2: obj.step_size(4): 1.5;
             all_combos = combvec(xs(1: obj.num_x_buckets), ...
                                  ys(1: obj.num_y_buckets), ...
                                  thetas(1: obj.num_theta_buckets), ...
