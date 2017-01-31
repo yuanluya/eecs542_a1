@@ -22,6 +22,7 @@ classdef PoseEstimator < handle
         child_relation
         parent_relation
         energy_map
+        all_combos
         match_cost_cache
         last_optimal
         
@@ -92,21 +93,16 @@ classdef PoseEstimator < handle
                 end
             end
             
-            %cell array, one cell for a part, a long map, 500000
-            %Mapping: mat2str(l_parent)->[min_energy, best_location]
+            %cell array, one cell for a part, 
+            %a matrix :[min_energy, optimal_location_idx (in obj.all_combos)]
             obj.energy_map = cell(numel(obj.ideal_parameters), 1);
-            for i = 1: numel(obj.ideal_parameters)
-                obj.energy_map{i} = containers.Map();
-            end
-            
             %initialize match cost cache
             obj.match_cost_cache = cell(numel(obj.ideal_parameters),1);
-            for j = 1:numel(obj.match_cost_cache)
-                obj.match_cost_cache{j} = containers.Map();
-            end
          end
          
-         function cost = deformCost(obj, part_p, part_c, lp, lc)
+         function cost = deformCost(obj, part_p, part_c, lp_idx, lc_idx)
+            lp = obj.all_combos(lp_idx, :);
+            lc = obj.all_combos(lc_idx, :);
             coor_p = obj.changeBase(lp, part_p);
             coor_c = obj.changeBase(lc, part_c); %x1,y1,x2,y2
             
@@ -127,21 +123,10 @@ classdef PoseEstimator < handle
             cost = x_diff + y_diff + theta_diff + scale_diff;
          end
          
-         %return true if not in image
-         function in_or_not = checkInPicture(obj, l_self)
-             in_or_not = ~(sum(l_self([1, 2]) > 0) ~= 2 ...
-                        || l_self(3) < obj.min_theta ...
-                        || l_self(1) > obj.img_width ...
-                        || l_self(2) > obj.img_height ...
-                        || l_self(3) > obj.max_theta ...
-                        || l_self(4) > obj.max_scale...
-                        || l_self(4) < obj.min_scale);
-         end
-         
-         function energy = calcEnergy(obj, self_part_idx, l_self, ...
-                                      parent_part_idx, l_parent)
+         function energy = calcEnergy(obj, self_part_idx, l_self_idx, ...
+                                      parent_part_idx, l_parent_idx)
              %check invalid location
-             if ~obj.checkInPicture(l_self)
+             if l_self_idx <= 0 || l_self_idx > size(obj.all_combos, 1)
                 energy = inf;
                 return;
              end
@@ -149,8 +134,8 @@ classdef PoseEstimator < handle
              if parent_part_idx
                  pair_wise_energy = obj.deformCost(parent_part_idx, ...
                                                   self_part_idx, ...
-                                                  l_parent, ...
-                                                  l_self);
+                                                  l_parent_idx, ...
+                                                  l_self_idx);
              else
                  pair_wise_energy = 0;
              end
@@ -158,36 +143,27 @@ classdef PoseEstimator < handle
              %children
              children_energy = 0;
              for c = 1: numel(obj.child_relation{self_part_idx})
-                assert(isKey(obj.energy_map{obj.child_relation{self_part_idx}(c)}, ...
-                    mat2str(l_self)), 'Havent done children parts');
-                energy_pair = obj.energy_map{obj.child_relation{self_part_idx}(c)}(mat2str(l_self));
-                children_energy = children_energy + energy_pair(1);
+                assert(sum(isnan(obj.energy_map{obj.child_relation{self_part_idx}(c)}(l_self_idx, :))) == 0, ...
+                    'Havent done children parts');
+                temp_energy = obj.energy_map{obj.child_relation{self_part_idx}(c)}(l_self_idx, 1);
+                children_energy = children_energy + temp_energy;
              end
              
              %match
-             if(~isKey(obj.match_cost_cache{self_part_idx},mat2str(l_self)))
-                 match_energy = obj.match_cost_weights * match_energy_cost(l_self, self_part_idx, obj.seq, obj.lF);
-                 obj.match_cost_cache{self_part_idx}(mat2str(l_self)) = match_energy;
+             if(isnan(obj.match_cost_cache{self_part_idx}(l_self_idx)))
+                 match_energy = obj.match_cost_weights * ...
+                     match_energy_cost(obj.all_combos(l_self_idx, :), self_part_idx, obj.seq, obj.lF);
+                 obj.match_cost_cache{self_part_idx}(l_self_idx) = match_energy;
              else
-                match_energy = obj.match_cost_cache{self_part_idx}(mat2str(l_self));
+                match_energy = obj.match_cost_cache{self_part_idx}(l_self_idx);
              end
              %total
              %fprintf('match cost: %f\tdeform cost: %f\n', match_energy, pair_wise_energy);
              energy = pair_wise_energy + match_energy + children_energy;
          end
          
-         
-         function real_child = sampleFromParent(obj, self_part_idx, parent_part_idx, l_parent)
-             %random sample from optimal_child
-             real_child = optimal_child;
-             return
-             %... + [randi(obj.random_init_radius), randi(obj.random_init_radius), 0, 0];
-             if ~obj.checkInPicture(real_child)
-                real_child = l_parent;
-             end
-         end
-         
-         function [current_min_energy, current_min] = localMin(obj, self_part_idx, parent_part_idx, l_parent)            
+         function [current_min_energy, current_min_idx] = localMin(obj, self_part_idx, ...
+                 parent_part_idx, l_parent_idx)            
             
             if isnan(obj.last_optimal)
                 init_idx = [randi([1, obj.num_x_buckets]), ...
@@ -200,23 +176,33 @@ classdef PoseEstimator < handle
                     %obj.random_radius * obj.step_size .* randi([-1, 1], 1, 4);
             end
             
-            %current_min = obj.sampleFromParent(self_part_idx, parent_part_idx, l_parent);
-            %current_min = l_parent;
-            current_min_energy = obj.calcEnergy(self_part_idx, current_min, parent_part_idx, l_parent);    
+            [~, current_min_idx] = ismember(current_min, obj.all_combos, 'rows');
+            current_min_energy = obj.calcEnergy(self_part_idx, current_min_idx, ...
+                                                parent_part_idx, l_parent_idx);    
             while true
                 neighbors1 = repmat(current_min, [4, 1]) - eye(4) .* diag(obj.step_size);
                 neighbors2 = repmat(current_min, [4, 1]) + eye(4) .* diag(obj.step_size);
                 all_neighbors = [neighbors1; neighbors2];
+                all_neighbors_idx = [
+                    current_min_idx - 1, ...
+                    current_min_idx - obj.num_x_buckets, ...
+                    current_min_idx - obj.num_y_buckets * obj.num_x_buckets, ...
+                    current_min_idx - obj.num_theta_buckets * obj.num_y_buckets * obj.num_x_buckets, ...
+                    current_min_idx + 1, ...
+                    current_min_idx + obj.num_x_buckets, ...
+                    current_min_idx + obj.num_y_buckets * obj.num_x_buckets, ...
+                    current_min_idx + obj.num_theta_buckets * obj.num_y_buckets * obj.num_x_buckets];
                 energies = zeros(9, 1);
                 for i = 2: 9
                     energies(i) = obj.calcEnergy(...
-                        self_part_idx, all_neighbors(i - 1, :), parent_part_idx, l_parent);
+                        self_part_idx, all_neighbors_idx(i - 1), parent_part_idx, l_parent_idx);
                 end
                 energies(1) = current_min_energy; %min return first element when equal
                 [current_min_energy, best_idx] = min(energies);
                 
                 if best_idx > 1
                     current_min = all_neighbors(best_idx - 1, :);
+                    current_min_idx = all_neighbors_idx(best_idx - 1);
                 else
                     obj.last_optimal = current_min;
                     %l_parent
@@ -228,33 +214,26 @@ classdef PoseEstimator < handle
          
          function updateEnergymap(obj, part_idx)
             obj.last_optimal = nan;
-            xs = (obj.step_size(1) / 2): obj.step_size(1): obj.img_width;
-            ys = (obj.step_size(2) / 2): obj.step_size(2): obj.img_height;
-            thetas = (-pi / 2 + (obj.step_size(3) / 2)): obj.step_size(3): pi / 2;
-            scales = 0.5 + obj.step_size(4) / 2: obj.step_size(4): 1.5;
-            all_combos = combvec(xs(1: obj.num_x_buckets), ...
-                                 ys(1: obj.num_y_buckets), ...
-                                 thetas(1: obj.num_theta_buckets), ...
-                                 scales(1: obj.num_scale_buckets)).';
+            
             if part_idx == obj.table_set_order(end)
-                for j = 1: size(all_combos, 1)
+                for j = 1: size(obj.all_combos, 1)
                     if mod(j, 50) == 0
                         fprintf('Part: %d, possiblility %d/%d\n', part_idx, j, ...
                             obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);
                     end
-                    total = obj.calcEnergy(part_idx, all_combos(j, :), [], []);
-                    obj.energy_map{part_idx}(mat2str(all_combos(j, :))) = total;
+                    total = obj.calcEnergy(part_idx, j, [], []);
+                    obj.energy_map{part_idx}(j, :) = [total, nan];
                 end
             else
-                for i = 1: size(all_combos, 1)
+                for i = 1: size(obj.all_combos, 1)
                     if mod(i, 50) == 0
                         fprintf('Part: %d, possiblility %d/%d\n', part_idx, i, ...
                             obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);                
                     end
-                    [temp_min_energy, temp_min] = ...
-                        obj.localMin(part_idx, obj.parent_relation{part_idx}, all_combos(i, :));                
-                    obj.energy_map{part_idx}(mat2str(all_combos(i, :))) = ...
-                        [temp_min_energy, temp_min];
+                    [temp_min_energy, temp_min_idx] = ...
+                        obj.localMin(part_idx, obj.parent_relation{part_idx}, i);                
+                    obj.energy_map{part_idx}(i, :) = ...
+                        [temp_min_energy, temp_min_idx];
                 end
             end
             
@@ -268,33 +247,51 @@ classdef PoseEstimator < handle
                              floor(obj.img_height / obj.num_y_buckets), ...
                              pi / obj.num_theta_buckets, 1 / obj.num_scale_buckets];
             
+            %set up all_combo
+            xs = (obj.step_size(1) / 2): obj.step_size(1): obj.img_width;
+            ys = (obj.step_size(2) / 2): obj.step_size(2): obj.img_height;
+            thetas = (-pi / 2 + (obj.step_size(3) / 2)): obj.step_size(3): pi / 2;
+            scales = 0.5 + obj.step_size(4) / 2: obj.step_size(4): 1.5;
+            obj.all_combos = combvec(xs(1: obj.num_x_buckets), ...
+                                 ys(1: obj.num_y_buckets), ...
+                                 thetas(1: obj.num_theta_buckets), ...
+                                 scales(1: obj.num_scale_buckets)).';
+            
+            for i = 1: numel(obj.ideal_parameters)
+                obj.energy_map{i} = nan(size(obj.all_combos, 1), 2);
+                obj.match_cost_cache{i} = nan(size(obj.all_combos, 1), 1);
+            end
+                                           
             %forward calculate energies
             for i = 1: numel(obj.table_set_order)
                 obj.updateEnergymap(obj.table_set_order(i));
             end
             %backward return optimal values for parts
             parts = zeros(obj.num_parts, 4);
+            parts_Lidx = zeros(obj.num_parts, 1);
             for j = numel(obj.table_set_order): -1: 1
                 % not backtrace yet
                 if sum(parts(obj.table_set_order(j), :) == 0) == 4
                     %not root
                     if obj.parent_relation{obj.table_set_order(j)}
                         temp = obj.energy_map{obj.table_set_order(j)} ...
-                            (mat2str(parts(obj.parent_relation{obj.table_set_order(j)}, :)));
-                        parts(obj.table_set_order(j), :) = temp(2: 5);
+                            (parts_Lidx(obj.parent_relation{obj.table_set_order(j)}), :);
+                        parts_Lidx(obj.table_set_order(j)) = temp(2);
+                        parts(obj.table_set_order(j), :) = obj.all_combos(temp(2), :);
                     else%root
-                        vals = cell2mat(values(obj.energy_map{obj.table_set_order(j)}));
-                        [~, idx] = min(vals);
-                        all_keys = keys(obj.energy_map{obj.table_set_order(j)});
-                        parts(obj.table_set_order(j), :) = eval(all_keys{idx});
+                        vals = obj.energy_map{obj.table_set_order(j)};
+                        [~, idx] = min(vals(:, 1));
+                        parts_Lidx(obj.table_set_order(j)) = idx;
+                        parts(obj.table_set_order(j), :) = obj.all_combos(idx, :);
                     end
                 end
                 %find the child of this part
                 for c = 1: numel(obj.child_relation{obj.table_set_order(j)})
                     child_part_idx = obj.child_relation{obj.table_set_order(j)}(c);
                     temp = obj.energy_map{child_part_idx} ...
-                            (mat2str(parts(obj.table_set_order(j), :)));
-                    parts(child_part_idx, :) = temp(2: 5);
+                            (parts_Lidx(obj.table_set_order(j)), :);
+                    parts_Lidx(child_part_idx) = temp(2);
+                    parts(child_part_idx, :) = obj.all_combos(temp(2), :);
                 end
             end
          end
@@ -313,12 +310,5 @@ classdef PoseEstimator < handle
                  + [dx, dy, -dx, -dy];
          end
          
-         function reset(obj)
-            obj.energy_map = cell(numel(obj.ideal_parameters), 1);
-            for i = 1: numel(obj.ideal_parameters)
-                obj.energy_map{i} = containers.Map('ValueType', 'any');
-                obj.match_cost_cache{i} = containers.Map('ValueType', 'any');
-            end
-         end
      end
 end
