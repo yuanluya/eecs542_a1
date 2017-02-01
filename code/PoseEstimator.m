@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 25
-        num_y_buckets = 25
-        num_theta_buckets = 15
-        num_scale_buckets = 5
+        num_x_buckets = 50
+        num_y_buckets = 50
+        num_theta_buckets = 20
+        num_scale_buckets = 10
         model_len = [160, 95, 95, 65, 65, 60];
         min_scale = 0.5
         max_scale = 1.5
