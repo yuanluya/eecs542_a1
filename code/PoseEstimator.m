@@ -18,7 +18,7 @@ classdef PoseEstimator < handle
         step_size
         search_step
         momentum = [-1 * ones(4, 1), ones(4, 1)]
-        momentum_step = -3
+        momentum_step = [-4, -4, -3, -2]
         
         %define the order to calculate energy
         table_set_order
@@ -198,7 +198,9 @@ classdef PoseEstimator < handle
                     obj.momentum = ones(1, 8);
                     wild_try = mod(best_idx + 4, 8);
                     wild_try = wild_try + (wild_try == 0) * 8;
-                    obj.momentum(wild_try) = obj.momentum_step;
+                    m_id = mod(best_idx, 4);
+                    m_id = m_id + (m_id == 0) * 4;
+                    obj.momentum(wild_try) = obj.momentum_step(m_id);
                 else
                     obj.last_optimal = current_min_idx;
                     return;
