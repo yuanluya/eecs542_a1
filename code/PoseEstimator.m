@@ -18,7 +18,7 @@ classdef PoseEstimator < handle
         step_size
         search_step
         momentum = [-1 * ones(4, 1), ones(4, 1)]
-        momentum_step = -2
+        momentum_step = -3
         
         %define the order to calculate energy
         table_set_order
@@ -174,17 +174,11 @@ classdef PoseEstimator < handle
                  parent_part_idx, l_parent_idx)            
             
             if isnan(obj.last_optimal)
-                init_idx = [randi([1, obj.num_x_buckets]), ...
-                            randi([1, obj.num_y_buckets]), ...
-                            floor(obj.num_theta_buckets / 2), floor(obj.num_scale_buckets / 2)];
-                current_min = [0, 0, obj.min_theta, obj.min_scale] ...
-                    + 0.5 * obj.step_size + (init_idx - 1) .* obj.step_size;
+                current_min_idx = randi(size(obj.all_combos, 1), 1);
             else
-                current_min = obj.last_optimal;% + ...
-                    %obj.random_radius * obj.step_size .* randi([-1, 1], 1, 4);
+                current_min_idx = obj.last_optimal;
             end
             
-            [~, current_min_idx] = ismember(current_min, obj.all_combos, 'rows');
             current_min_energy = obj.calcEnergy(self_part_idx, current_min_idx, ...
                                                 parent_part_idx, l_parent_idx);
             obj.momentum = ones(1, 8);
@@ -199,15 +193,13 @@ classdef PoseEstimator < handle
                 [current_min_energy, best_idx] = min(energies);
                 
                 if best_idx > 1
-                    current_min = obj.all_combos(all_neighbors_idx(best_idx - 1), :);
                     current_min_idx = all_neighbors_idx(best_idx - 1);
                     obj.momentum = ones(1, 8);
                     wild_try = mod(best_idx + 4, 8);
                     wild_try = wild_try + (wild_try == 0) * 8;
                     obj.momentum(wild_try) = obj.momentum_step;
                 else
-                    obj.last_optimal = current_min;
-                    %l_parent
+                    obj.last_optimal = current_min_idx;
                     return;
                 end
                 
@@ -298,7 +290,7 @@ classdef PoseEstimator < handle
             end
          end
          
-         %coor is in format [x1,x2,y1,y2]
+         %coor is in format [x1, y1, x2, y2]
          function coor = changeBase(obj, location, part_idx) 
             stick_len = location(4) * obj.model_len(part_idx);
             if part_idx == 2 || part_idx == 3
