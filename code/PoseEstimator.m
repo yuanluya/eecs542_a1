@@ -16,7 +16,9 @@ classdef PoseEstimator < handle
         %[x, y, theta, scale], scale: [0.5, 1.5]
         ideal_parameters
         step_size
-        momentum
+        search_step
+        momentum = [-1 * ones(4, 1), ones(4, 1)]
+        momentum_step = -2
         
         %define the order to calculate energy
         table_set_order
@@ -99,6 +101,11 @@ classdef PoseEstimator < handle
             obj.energy_map = cell(numel(obj.ideal_parameters), 1);
             %initialize match cost cache
             obj.match_cost_cache = cell(numel(obj.ideal_parameters),1);
+            
+            search_step = [1, obj.num_x_buckets, ...
+                            obj.num_y_buckets * obj.num_x_buckets, ...
+                            obj.num_theta_buckets * obj.num_y_buckets * obj.num_x_buckets];
+            obj.search_step = [-1 * search_step, search_step];
          end
          
          function cost = deformCost(obj, part_p, part_c, lp_idx, lc_idx)
@@ -114,9 +121,9 @@ classdef PoseEstimator < handle
             diff_junct = dists(I, :);
             
             x_diff = obj.deform_cost_weights(part_p, part_c, 1) * ...
-                abs(diff_junct(1));
+                diff_junct(1)^2;
             y_diff = obj.deform_cost_weights(part_p, part_c, 2) * ...
-                abs(diff_junct(2));
+                diff_junct(2)^2;
             theta_diff = obj.deform_cost_weights(part_p, part_c, 3) * ...
                 abs(lc(3) - lp(3));
             scale_diff = obj.deform_cost_weights(part_p, part_c, 4) * ...
@@ -179,17 +186,10 @@ classdef PoseEstimator < handle
             
             [~, current_min_idx] = ismember(current_min, obj.all_combos, 'rows');
             current_min_energy = obj.calcEnergy(self_part_idx, current_min_idx, ...
-                                                parent_part_idx, l_parent_idx);    
+                                                parent_part_idx, l_parent_idx);
+            obj.momentum = ones(1, 8);
             while true
-                all_neighbors_idx = [
-                    current_min_idx - 1, ...
-                    current_min_idx - obj.num_x_buckets, ...
-                    current_min_idx - obj.num_y_buckets * obj.num_x_buckets, ...
-                    current_min_idx - obj.num_theta_buckets * obj.num_y_buckets * obj.num_x_buckets, ...
-                    current_min_idx + 1, ...
-                    current_min_idx + obj.num_x_buckets, ...
-                    current_min_idx + obj.num_y_buckets * obj.num_x_buckets, ...
-                    current_min_idx + obj.num_theta_buckets * obj.num_y_buckets * obj.num_x_buckets];
+                all_neighbors_idx = current_min_idx * ones(1, 8) + obj.search_step .* obj.momentum;
                 energies = zeros(9, 1);
                 for i = 2: 9
                     energies(i) = obj.calcEnergy(...
@@ -201,6 +201,10 @@ classdef PoseEstimator < handle
                 if best_idx > 1
                     current_min = obj.all_combos(all_neighbors_idx(best_idx - 1), :);
                     current_min_idx = all_neighbors_idx(best_idx - 1);
+                    obj.momentum = ones(1, 8);
+                    wild_try = mod(best_idx + 4, 8);
+                    wild_try = wild_try + (wild_try == 0) * 8;
+                    obj.momentum(wild_try) = obj.momentum_step;
                 else
                     obj.last_optimal = current_min;
                     %l_parent
