@@ -16,6 +16,7 @@ classdef PoseEstimator < handle
         %[x, y, theta, scale], scale: [0.5, 1.5]
         ideal_parameters
         step_size
+        momentum
         
         %define the order to calculate energy
         table_set_order
@@ -180,9 +181,6 @@ classdef PoseEstimator < handle
             current_min_energy = obj.calcEnergy(self_part_idx, current_min_idx, ...
                                                 parent_part_idx, l_parent_idx);    
             while true
-                neighbors1 = repmat(current_min, [4, 1]) - eye(4) .* diag(obj.step_size);
-                neighbors2 = repmat(current_min, [4, 1]) + eye(4) .* diag(obj.step_size);
-                all_neighbors = [neighbors1; neighbors2];
                 all_neighbors_idx = [
                     current_min_idx - 1, ...
                     current_min_idx - obj.num_x_buckets, ...
@@ -201,7 +199,7 @@ classdef PoseEstimator < handle
                 [current_min_energy, best_idx] = min(energies);
                 
                 if best_idx > 1
-                    current_min = all_neighbors(best_idx - 1, :);
+                    current_min = obj.all_combos(all_neighbors_idx(best_idx - 1), :);
                     current_min_idx = all_neighbors_idx(best_idx - 1);
                 else
                     obj.last_optimal = current_min;
