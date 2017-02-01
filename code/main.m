@@ -50,11 +50,5 @@ deform_param(:, :, 3) = 100 * deform_param_theta;
 deform_param(:, :, 4) = 200 * deform_param_scale;
 
 a = PoseEstimator(ideal_parameters, [4, 5, 2, 3, 6, 1], child_relation, deform_param);
-proposed_parts = a.estimate('007530.jpg')
-[parts, ~] = size(proposed_parts);
-sticks = zeros(4, parts);
-for i = 1: parts
-    sticks(:, i) = a.changeBase(proposed_parts(i,:), i);
-end
-sticks
-stick_hdl = DrawStickman(sticks, imread('../buffy_s5e2_original/007530.jpg'));
+sticks = a.estimate('000063.jpg')
+stick_hdl = DrawStickman(sticks, imread('../buffy_s5e2_original/000063.jpg'));

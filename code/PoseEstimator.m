@@ -3,9 +3,9 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 25
-        num_y_buckets = 25
-        num_theta_buckets = 15
+        num_x_buckets = 20
+        num_y_buckets = 20
+        num_theta_buckets = 10
         num_scale_buckets = 5
         model_len = [160, 95, 95, 65, 65, 60];
         min_scale = 0.5
@@ -27,6 +27,7 @@ classdef PoseEstimator < handle
         energy_map
         all_combos
         match_cost_cache
+        change_base_cache
         last_optimal
         
         %need to be tuned
@@ -111,8 +112,8 @@ classdef PoseEstimator < handle
          function cost = deformCost(obj, part_p, part_c, lp_idx, lc_idx)
             lp = obj.all_combos(lp_idx, :);
             lc = obj.all_combos(lc_idx, :);
-            coor_p = obj.changeBase(lp, part_p);
-            coor_c = obj.changeBase(lc, part_c); %x1,y1,x2,y2
+            coor_p = obj.changeBase(lp_idx, part_p);
+            coor_c = obj.changeBase(lc_idx, part_c); %x1,y1,x2,y2
             
             coor_C = [coor_c; [coor_c(3: 4), coor_c(1: 2)]];
             dists = bsxfun(@minus, coor_C, coor_p);
@@ -257,8 +258,9 @@ classdef PoseEstimator < handle
             for i = 1: numel(obj.ideal_parameters)
                 obj.energy_map{i} = nan(size(obj.all_combos, 1), 2);
                 obj.match_cost_cache{i} = nan(size(obj.all_combos, 1), 1);
+                obj.change_base_cache{i} = nan(size(obj.all_combos, 1), 4);
             end
-                                           
+            
             %forward calculate energies
             for i = 1: numel(obj.table_set_order)
                 obj.updateEnergymap(obj.table_set_order(i));
@@ -274,12 +276,14 @@ classdef PoseEstimator < handle
                         temp = obj.energy_map{obj.table_set_order(j)} ...
                             (parts_Lidx(obj.parent_relation{obj.table_set_order(j)}), :);
                         parts_Lidx(obj.table_set_order(j)) = temp(2);
-                        parts(obj.table_set_order(j), :) = obj.all_combos(temp(2), :);
+                        parts(obj.table_set_order(j), :) = ...
+                            obj.changeBase(temp(2), obj.table_set_order(j));
                     else%root
                         vals = obj.energy_map{obj.table_set_order(j)};
                         [~, idx] = min(vals(:, 1));
                         parts_Lidx(obj.table_set_order(j)) = idx;
-                        parts(obj.table_set_order(j), :) = obj.all_combos(idx, :);
+                        parts(obj.table_set_order(j), :) = ...
+                            obj.changeBase(idx, obj.table_set_order(j));
                     end
                 end
                 %find the child of this part
@@ -288,13 +292,20 @@ classdef PoseEstimator < handle
                     temp = obj.energy_map{child_part_idx} ...
                             (parts_Lidx(obj.table_set_order(j)), :);
                     parts_Lidx(child_part_idx) = temp(2);
-                    parts(child_part_idx, :) = obj.all_combos(temp(2), :);
+                    parts(child_part_idx, :) = ...
+                        obj.changeBase(temp(2), child_part_idx);
                 end
             end
+            parts = parts.';
          end
          
          %coor is in format [x1, y1, x2, y2]
-         function coor = changeBase(obj, location, part_idx) 
+         function coor = changeBase(obj, location_idx, part_idx) 
+            if false%sum(isnan(obj.change_base_cache{part_idx}(location_idx, :))) == 0
+                coor = obj.change_base_cache{part_idx}(location_idx, :);
+                return;
+            end
+            location = obj.all_combos(location_idx, :);
             stick_len = location(4) * obj.model_len(part_idx);
             if part_idx == 2 || part_idx == 3
                 dx = 0.5 * stick_len * cos(location(3));
@@ -305,6 +316,7 @@ classdef PoseEstimator < handle
             end
             coor = [location(1), location(2), location(1), location(2)] ...
                  + [dx, dy, -dx, -dy];
+            obj.change_base_cache{part_idx}(location_idx, :) = coor;
          end
          
      end
