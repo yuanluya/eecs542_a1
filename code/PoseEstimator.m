@@ -3,9 +3,9 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 20
-        num_y_buckets = 20
-        num_theta_buckets = 10
+        num_x_buckets = 25
+        num_y_buckets = 25
+        num_theta_buckets = 15
         num_scale_buckets = 5
         model_len = [160, 95, 95, 65, 65, 60];
         min_scale = 0.5
@@ -121,9 +121,9 @@ classdef PoseEstimator < handle
             diff_junct = dists(I, :);
             
             x_diff = obj.deform_cost_weights(part_p, part_c, 1) * ...
-                diff_junct(1)^2;
+                abs(diff_junct(1));
             y_diff = obj.deform_cost_weights(part_p, part_c, 2) * ...
-                diff_junct(2)^2;
+                abs(diff_junct(2));
             theta_diff = obj.deform_cost_weights(part_p, part_c, 3) * ...
                 abs(lc(3) - lp(3));
             scale_diff = obj.deform_cost_weights(part_p, part_c, 4) * ...
@@ -138,6 +138,7 @@ classdef PoseEstimator < handle
                 energy = inf;
                 return;
              end
+             
              %pairwise
              if parent_part_idx
                  pair_wise_energy = obj.deformCost(parent_part_idx, ...
@@ -211,7 +212,7 @@ classdef PoseEstimator < handle
             
             if part_idx == obj.table_set_order(end)
                 for j = 1: size(obj.all_combos, 1)
-                    if mod(j, 50) == 0
+                    if mod(j, 100) == 0
                         fprintf('Part: %d, possiblility %d/%d\n', part_idx, j, ...
                             obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);
                     end
@@ -220,7 +221,7 @@ classdef PoseEstimator < handle
                 end
             else
                 for i = 1: size(obj.all_combos, 1)
-                    if mod(i, 50) == 0
+                    if mod(i, 100) == 0
                         fprintf('Part: %d, possiblility %d/%d\n', part_idx, i, ...
                             obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);                
                     end

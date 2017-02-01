@@ -17,44 +17,44 @@ child_relation{6} = [];                     %head
 
 %A_ij means relation between parent i, child j
 deform_param = ...
-  [0, 1, 1, 0, 0, 10; 
-   0, 0, 0, 5, 0, 0; 
-   0, 0, 0, 0, 5, 0; 
+  [0, 0.1, 0.1, 0, 0, 3; 
+   0, 0, 0, 1, 0, 0; 
+   0, 0, 0, 0, 1, 0; 
    0, 0, 0, 0, 0, 0;
    0, 0, 0, 0, 0, 0;
    0, 0, 0, 0, 0, 0;]; %x
 deform_param_y = ...
-  [0, 1, 1, 0, 0, 10; 
-   0, 0, 0, 5, 0, 0; 
-   0, 0, 0, 0, 5, 0; 
+  [0, 0.3, 0.3, 0, 0, 3; 
+   0, 0, 0, 1, 0, 0; 
+   0, 0, 0, 0, 1, 0; 
    0, 0, 0, 0, 0, 0;
    0, 0, 0, 0, 0, 0;
    0, 0, 0, 0, 0, 0;]; %y
 deform_param_theta = ...
-  [0, 0.5, 0.5, 0, 0, 0.5; 
-   0, 0, 0, 0.1, 0, 0; 
-   0, 0, 0, 0, 0.1, 0; 
+  [0, 0, 0, 0, 0, 0.5; 
+   0, 0, 0, 4, 0, 0; 
+   0, 0, 0, 0, 4, 0; 
    0, 0, 0, 0, 0, 0;
    0, 0, 0, 0, 0, 0;
    0, 0, 0, 0, 0, 0;]; %theta
 deform_param_scale = ...
-  [0, 1, 1, 0, 0, 1; 
-   0, 0, 0, 0.5, 0, 0; 
-   0, 0, 0, 0, 0.5, 0; 
+  [0, 0, 0, 0, 0, 0; 
+   0, 0, 0, 0, 0, 0; 
+   0, 0, 0, 0, 0, 0; 
    0, 0, 0, 0, 0, 0;
    0, 0, 0, 0, 0, 0;
    0, 0, 0, 0, 0, 0;]; %scale
 
 deform_param(:, :, 2) = deform_param_y;
 deform_param(:, :, 3) = 100 * deform_param_theta;
-deform_param(:, :, 4) = 300 * deform_param_scale;
+deform_param(:, :, 4) = 200 * deform_param_scale;
 
-a = PoseEstimator(ideal_parameters, [4, 5, 2, 3, 6, 1], child_relation, 0.01 * deform_param);
-proposed_parts = a.estimate('000071.jpg')
+a = PoseEstimator(ideal_parameters, [4, 5, 2, 3, 6, 1], child_relation, deform_param);
+proposed_parts = a.estimate('007530.jpg')
 [parts, ~] = size(proposed_parts);
 sticks = zeros(4, parts);
 for i = 1: parts
     sticks(:, i) = a.changeBase(proposed_parts(i,:), i);
 end
 sticks
-stick_hdl = DrawStickman(sticks, imread('../buffy_s5e2_original/000071.jpg'));
+stick_hdl = DrawStickman(sticks, imread('../buffy_s5e2_original/007530.jpg'));
