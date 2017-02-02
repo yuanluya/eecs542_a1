@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 50
-        num_y_buckets = 50
-        num_theta_buckets = 20
-        num_scale_buckets = 10
+        num_x_buckets = 20
+        num_y_buckets = 20
+        num_theta_buckets = 10
+        num_scale_buckets = 5
         model_len
         min_scale = 0.5
         max_scale = 1.5
@@ -153,8 +153,9 @@ classdef PoseEstimator < handle
              
              %match
              if(isnan(obj.match_cost_cache{self_part_idx}(l_self_idx)))
+                 fixed_part_idx = self_part_idx + (self_part_idx == 4) * 2;
                  match_energy = obj.match_cost_weights * ...
-                     match_energy_cost(obj.all_combos(l_self_idx, :), self_part_idx, obj.seq, obj.lF);
+                     match_energy_cost(obj.all_combos(l_self_idx, :), fixed_part_idx, obj.seq, obj.lF);
                  obj.match_cost_cache{self_part_idx}(l_self_idx) = match_energy;
              else
                 match_energy = obj.match_cost_cache{self_part_idx}(l_self_idx);
