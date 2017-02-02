@@ -2,7 +2,7 @@ classdef PoseEstimator < handle
     
      properties (GetAccess = public, SetAccess = public)
         
-        num_parts = 4
+        num_parts
         num_x_buckets = 50
         num_y_buckets = 50
         num_theta_buckets = 20
