@@ -7,14 +7,13 @@ classdef PoseEstimator < handle
         num_y_buckets = 50
         num_theta_buckets = 20
         num_scale_buckets = 10
-        model_len = [160, 95, 95, 65, 65, 60];
+        model_len
         min_scale = 0.5
         max_scale = 1.5
         min_theta = -pi / 2
         max_theta = pi / 2
         
         %[x, y, theta, scale], scale: [0.5, 1.5]
-        ideal_parameters
         step_size
         search_step
         momentum = [-1 * ones(4, 1), ones(4, 1)]
@@ -50,7 +49,7 @@ classdef PoseEstimator < handle
      end
      
      methods (Access = public)
-         function obj = PoseEstimator(ideal_parameters, table_set_order, child_relation, deform_cost_weights)
+         function obj = PoseEstimator(table_set_order, child_relation, model_len, deform_cost_weights)
             
             all_names = dir(obj.image_dir);
             obj.all_names = containers.Map();
@@ -65,6 +64,7 @@ classdef PoseEstimator < handle
                 end
             end
             obj.table_set_order = table_set_order;
+            obj.model_len = model_len;
             obj.child_relation = child_relation;
             obj.parent_relation = cell(numel(obj.child_relation), 1);
             %get parent order             
@@ -74,34 +74,16 @@ classdef PoseEstimator < handle
                         [obj.parent_relation{obj.child_relation{i}(c)}, i];
                 end
             end
-            obj.num_parts = numel(ideal_parameters);
+            obj.num_parts = numel(obj.table_set_order);
             obj.deform_cost_weights = zeros(4, obj.num_parts, obj.num_parts);
             
             obj.deform_cost_weights = deform_cost_weights;
             
-            obj.ideal_parameters = ideal_parameters;
-            for j  = 1: 4
-                obj.ideal_parameters{j} = zeros(length(ideal_parameters{j}));
-                if j ~= 3
-                    for p = 1: numel(child_relation)
-                        for c = 1: numel(child_relation{p})
-                            if j == 4 %scale
-                                obj.ideal_parameters{j}(p, child_relation{p}(c)) = ...
-                                    ideal_parameters{child_relation{p}(c)}(j) / ideal_parameters{p}(j);
-                            else
-                                obj.ideal_parameters{j}(p, child_relation{p}(c)) = ...
-                                    ideal_parameters{child_relation{p}(c)}(j) - ideal_parameters{p}(j);
-                            end
-                        end
-                    end
-                end
-            end
-            
             %cell array, one cell for a part, 
             %a matrix :[min_energy, optimal_location_idx (in obj.all_combos)]
-            obj.energy_map = cell(numel(obj.ideal_parameters), 1);
+            obj.energy_map = cell(obj.num_parts, 1);
             %initialize match cost cache
-            obj.match_cost_cache = cell(numel(obj.ideal_parameters),1);
+            obj.match_cost_cache = cell(obj.num_parts, 1);
             
             search_step = [1, obj.num_x_buckets, ...
                             obj.num_y_buckets * obj.num_x_buckets, ...
@@ -265,7 +247,7 @@ classdef PoseEstimator < handle
                                  thetas(1: obj.num_theta_buckets), ...
                                  scales(1: obj.num_scale_buckets)).';
             
-            for i = 1: numel(obj.ideal_parameters)
+            for i = 1: obj.num_parts
                 obj.energy_map{i} = nan(size(obj.all_combos, 1), 2);
                 obj.match_cost_cache{i} = nan(size(obj.all_combos, 1), 1);
                 obj.change_base_cache{i} = nan(size(obj.all_combos, 1), 8);
