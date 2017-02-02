@@ -112,11 +112,19 @@ classdef PoseEstimator < handle
          function cost = deformCost(obj, part_p, part_c, lp_idx, lc_idx)
             lp = obj.all_combos(lp_idx, :);
             lc = obj.all_combos(lc_idx, :);
-            coor_p = obj.changeBase(lp_idx, part_p);
-            coor_c = obj.changeBase(lc_idx, part_c); %x1,y1,x2,y2
+            coor_p = obj.change_base_cache{part_p}(lp_idx, :);
+            coor_c = obj.change_base_cache{part_c}(lc_idx, :);
+            if isnan(coor_p(1))
+                coor_p = obj.changeBase(lp_idx, part_p);
+                obj.change_base_cache{part_p}(lp_idx, :) = coor_p;
+            end
+            if isnan(coor_c(1))
+                coor_c = obj.changeBase(lc_idx, part_c);
+                obj.change_base_cache{part_c}(lc_idx, :) = coor_c;
+            end
             
             coor_C = [coor_c; [coor_c(3: 4), coor_c(1: 2)]];
-            dists = bsxfun(@minus, coor_C, coor_p);
+            dists = coor_C - repmat(coor_p, [2, 1]);
             dists = [dists(:, [1, 2]); dists(:, [3, 4])];
             [~, I] = min(sum(dists .^ 2, 2));
             diff_junct = dists(I, :);
@@ -215,7 +223,7 @@ classdef PoseEstimator < handle
             
             if part_idx == obj.table_set_order(end)
                 for j = 1: size(obj.all_combos, 1)
-                    if mod(j, 100) == 0
+                    if mod(j, 10000) == 0
                         fprintf('Part: %d, possiblility %d/%d\n', part_idx, j, ...
                             obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);
                     end
@@ -224,7 +232,7 @@ classdef PoseEstimator < handle
                 end
             else
                 for i = 1: size(obj.all_combos, 1)
-                    if mod(i, 100) == 0
+                    if mod(i, 10000) == 0
                         fprintf('Part: %d, possiblility %d/%d\n', part_idx, i, ...
                             obj.num_x_buckets * obj.num_y_buckets * obj.num_theta_buckets * obj.num_scale_buckets);                
                     end
@@ -301,10 +309,6 @@ classdef PoseEstimator < handle
          
          %coor is in format [x1, y1, x2, y2]
          function coor = changeBase(obj, location_idx, part_idx) 
-            if sum(isnan(obj.change_base_cache{part_idx}(location_idx, :))) == 0
-                coor = obj.change_base_cache{part_idx}(location_idx, :);
-                return;
-            end
             location = obj.all_combos(location_idx, :);
             stick_len = location(4) * obj.model_len(part_idx);
             if part_idx == 2 || part_idx == 3
@@ -316,7 +320,6 @@ classdef PoseEstimator < handle
             end
             coor = [location(1), location(2), location(1), location(2)] ...
                  + [dx, dy, -dx, -dy];
-            obj.change_base_cache{part_idx}(location_idx, :) = coor;
          end
          
      end
