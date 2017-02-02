@@ -3,10 +3,10 @@ classdef PoseEstimator < handle
      properties (GetAccess = public, SetAccess = public)
         
         num_parts = 4
-        num_x_buckets = 20
-        num_y_buckets = 20
-        num_theta_buckets = 10
-        num_scale_buckets = 5
+        num_x_buckets = 50
+        num_y_buckets = 50
+        num_theta_buckets = 20
+        num_scale_buckets = 10
         model_len = [160, 95, 95, 65, 65, 60];
         min_scale = 0.5
         max_scale = 1.5
@@ -301,7 +301,7 @@ classdef PoseEstimator < handle
          
          %coor is in format [x1, y1, x2, y2]
          function coor = changeBase(obj, location_idx, part_idx) 
-            if false%sum(isnan(obj.change_base_cache{part_idx}(location_idx, :))) == 0
+            if sum(isnan(obj.change_base_cache{part_idx}(location_idx, :))) == 0
                 coor = obj.change_base_cache{part_idx}(location_idx, :);
                 return;
             end
